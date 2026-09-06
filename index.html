@@ -53,18 +53,50 @@
       padding: 20px;
       box-sizing: border-box;
       border: 2px solid #444;
+      overflow: hidden;
     }
 
-    #modal-video {
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
+    /* Taustavideo */
+    #bg-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      border: 4px solid #007bff;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.8);
-      align-self: flex-start;
+      z-index: 1;
       display: none;
-      background: #000;
+    }
+
+    /* Puhuva Lara kokovartalona ilman pyöreää kehystä */
+    #modal-video {
+      position: absolute;
+      z-index: 5;
+      right: auto;
+      left: 12px;
+      bottom: 18px;
+      width: auto;
+      height: 58%;
+      max-width: 42%;
+      object-fit: contain;
+      object-position: left bottom;
+      border-radius: 0;
+      display: none;
+      background: transparent;
+      box-shadow: none;
+      -webkit-mask-image: none;
+      mask-image: none;
+      filter: drop-shadow(0 5px 10px rgba(0,0,0,0.55));
+    }
+
+    @media (max-width: 600px) {
+      #modal-video {
+        right: auto;
+        left: 6px;
+        bottom: 12px;
+        height: 54%;
+        max-width: 46%;
+      }
     }
 
     .close-btn {
@@ -98,14 +130,23 @@
 
   <div id="media-modal">
     <div class="modal-content" id="modal-box">
+      <!-- Taustavideo -->
+      <video id="bg-video" autoplay loop muted playsinline></video>
+      
       <button class="close-btn" onclick="suljeModal()">✕</button>
       
+      <!-- Puhuva Avatar -video -->
       <video id="modal-video" autoplay controls playsinline></video>
       
-      <div style="background: rgba(0, 0, 0, 0.8); padding: 12px 16px; border-radius: 8px; backdrop-filter: blur(4px);">
-        <h2 id="modal-title" style="margin:0 0 4px 0; color: #fff;"></h2>
-        <p id="modal-desc" style="margin:0; font-size: 14px; color: #ddd;"></p>
+      <!-- Kohteen nimi ja kuvaus: näkyy alussa 5 sekuntia ja häviää pehmeästi -->
+      <div id="modal-info-panel" style="position: absolute; left: 20px; right: 20px; bottom: 12px; z-index: 6; background: rgba(0, 0, 0, 0.72); padding: 7px 12px; border-radius: 7px; backdrop-filter: blur(4px); opacity: 1; transition: opacity 1s ease;">
+        <h2 id="modal-title" style="margin:0 0 2px 0; color:#fff; font-size:20px;"></h2>
+        <p id="modal-desc" style="margin:0; font-size:13px; color:#ddd;"></p>
       </div>
+      <a id="linnoitus-linkki" href="#" target="_blank" rel="noopener"
+         style="display:none; position:absolute; right:20px; bottom:24px; z-index:8; padding:12px 18px; background:#7a241f; color:#fff; text-decoration:none; font-weight:bold; border-radius:9px; box-shadow:0 4px 14px rgba(0,0,0,.55);">
+        🎧 Avaa Linnoituksen äänikävely
+      </a>
     </div>
   </div>
 
@@ -124,18 +165,18 @@
         lat: 61.059663,
         lng: 28.180214,
         audio: "",
-        kuvaus: "Kuuno Sevónin 1963 pystyttämä muistomerkki ja Nikolain vallit.",
-        kuva: "patsas.jpg",
-        video: "patsas.mp4" /* TARKISTA ETTÄ TIEDOSTON NIMI ON GITHUBISSA TÄMÄ */
+        kuvaus: "Wäino Aaltosen 1963 pystyttämä muistomerkki ja Nikolain vallit.",
+        kuva: "muistomerkki.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
+        video: "patsas.webm"
       },
       {
-        nimi: "Rakuunamäen pääportti",
+        nimi: "Rakuunamäen pääportti & Pave Maijanen",
         lat: 61.0597830,
         lng: 28.1789770,
         audio: "",
-        kuvaus: "Historiallinen pääportti, joka erotti siviilielämän ja sotilaallisen kurin.",
-        kuva: "paaportti.jpg",
-        video: "paaportti.mov"
+        kuvaus: "Historiallinen pääportti ja Pave Maijasen lapsuudenkoti.",
+        kuva: "paaportti.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
+        video: "paaportti.webm"
       },
       {
         nimi: "päävartio rakennus",
@@ -143,7 +184,8 @@
         lng: 28.1784266,
         audio: "putka.mp3",
         kuvaus: "Päävartiorakennus ja putka.",
-        kuva: ""
+        kuva: "putka.png",
+        video: "paavartio.webm"
       },
       {
         nimi: "pohjustus ennen rakuunahotellia",
@@ -151,7 +193,8 @@
         lng: 28.1774570,
         audio: "pohjustus.mp3",
         kuvaus: "Pohjustus ennen hotellia.",
-        kuva: "" 
+        kuva: "pohjustus.png",
+        video: "pohjustus.webm" 
       },
       {
         nimi: "rakuunahotelli",
@@ -159,7 +202,8 @@
         lng: 28.17633415,
         audio: "rakuunahotelli.mp3",
         kuvaus: "Rakuunahotelli.",
-        kuva: ""
+        kuva: "hotellirakuuna.mp4",
+        video: "rakuunahotelli.webm"
       },
       {
         nimi: "sotilaskoti",
@@ -167,7 +211,8 @@
         lng: 28.175187,
         audio: "sotku.mp3",
         kuvaus: "Sotilaskoti eli Sotku.",
-        kuva: ""
+        kuva: "sotku.mp4",
+        video: "sotku.webm"
       },
       {    
         nimi: "ruokala",
@@ -175,15 +220,17 @@
         lng: 28.1737116,
         audio: "ruokala.mp3",
         kuvaus: "Kasarmin ruokala.",
-        kuva: ""
+        kuva: "ruokala.mp4",
+        video: "ruokala.webm"
       },
       { 
         nimi: "chymos portti",
         lat: 61.058047,
         lng: 28.173163,
-        audio: "chymoksenportti.mp3",
+        audio: "chymosportti.mp3",
         kuvaus: "Chymoksen tehtaan portti.",
-        kuva: ""
+        kuva: "chymosportti.mp4",
+        video: "chymosportti.webm"
       },
       { 
         nimi: "chymos",
@@ -191,7 +238,8 @@
         lng: 28.1722136,
         audio: "chymos.mp3",
         kuvaus: "Chymoksen makeistehdasalue.",
-        kuva: ""     
+        kuva: "chymos.png",
+        video: "chymos.webm"     
       },
       {
         nimi: "Upseerikerho",
@@ -199,7 +247,8 @@
         lng: 28.1705692,
         audio: "Upseerikerho.mp3",
         kuvaus: "Historiallinen Rakuunamäen Upseerikerho.",
-        kuva: "upseerikerho.jpg"
+        kuva: "upseerikerho.mp4",
+        video: "upseerikerho.webm"
       },
       {
        nimi: "Tuju Taproom",
@@ -207,7 +256,8 @@
         lng: 28.1737352,
         audio: "Tuju.mp3",
         kuvaus: "TapRoom.",
-        kuva: ""
+        kuva: "tuju.mp4",
+        video: "tuju.webm"
       },
       {
         nimi: "Adolf Ehrnroothin aukio",
@@ -215,7 +265,19 @@
         lng: 28.174944,
         audio: "Adolf Ehrnroothin aukio.mp3",
         kuvaus: "Rakuunamäen keskusaukio ja päätepiste.",
-        kuva: "aukio.jpg"
+        kuva: "keskusaukio.mp4",
+        video: "aukio.webm"
+      },
+      {
+        nimi: "Jatka matkaa Linnoitukseen",
+        loppukohtaus: true,
+        audio: "",
+        kuvaus: "Koe Lappeenrannan Linnoituksen äänikävely paikan päällä.",
+        kuva: "linnoitus_loppu.png",
+        video: "lara_linnoitus.webm",
+        // ↓↓↓ LIITÄ LINNOITUKSEN ECHOES-KÄVELYN LINKKI ALLA OLEVIEN LAINAUSMERKKIEN VÄLIIN ↓↓↓
+         // Esimerkki: linkki: "https://explore.echoes.xyz/collections/GCyRId4eGQP7n8Nv.",
+         linkki: "LINNOITUS_ECHOES_LINKKI_TAHAN"
       }
     ];
 
@@ -225,6 +287,7 @@
     let meidanTimeout = null;
     const player = document.getElementById('audio-player');
     const videoPlayer = document.getElementById('modal-video');
+    const bgVideo = document.getElementById('bg-video');
     const modal = document.getElementById('media-modal');
     const modalBox = document.getElementById('modal-box');
 
@@ -238,6 +301,7 @@
     const hahmoMarker = L.marker([kohteet[0].lat, kohteet[0].lng], { icon: hahmoIcon }).addTo(map);
 
     kohteet.forEach((kohde, index) => {
+      if (kohde.loppukohtaus) return;
       const marker = L.marker([kohde.lat, kohde.lng]).addTo(map);
       marker.bindPopup(`<b>${kohde.nimi}</b>`);
       
@@ -257,6 +321,13 @@
       if (meidanTimeout) clearTimeout(meidanTimeout);
       nykyinenIndex = index;
       const kohde = kohteet[index];
+
+      // Linnoitus on erillinen loppukortti: karttahahmo jää Ehrnroothin aukiolle.
+      if (kohde.loppukohtaus) {
+        aktivoiMedia(kohde);
+        return;
+      }
+
       const lahto = hahmoMarker.getLatLng();
       const maali = L.latLng(kohde.lat, kohde.lng);
 
@@ -296,15 +367,43 @@
       document.getElementById('modal-title').innerText = kohde.nimi;
       document.getElementById('modal-desc').innerText = kohde.kuvaus;
 
-      if (kohde.kuva && kohde.kuva.trim() !== "") {
+      // Näytä kohdepalkki aina uuden kohteen alussa ja häivytä se 5 sekunnin kuluttua
+      const infoPanel = document.getElementById('modal-info-panel');
+      infoPanel.style.display = 'block';
+      infoPanel.style.opacity = '1';
+      if (window.infoPanelTimeout) clearTimeout(window.infoPanelTimeout);
+      if (window.infoPanelHideTimeout) clearTimeout(window.infoPanelHideTimeout);
+      window.infoPanelTimeout = setTimeout(() => {
+        infoPanel.style.opacity = '0';
+        window.infoPanelHideTimeout = setTimeout(() => {
+          infoPanel.style.display = 'none';
+        }, 1000);
+      }, 5000);
+
+      // Tarkistetaan onko kuva-kentässä taustavideo (.mp4) vai valokuva (.jpg/.png)
+      if (kohde.kuva && kohde.kuva.toLowerCase().endsWith('.mp4')) {
+        modalBox.style.backgroundImage = "none";
+        bgVideo.style.display = "block";
+        bgVideo.src = kohde.kuva;
+        bgVideo.play().catch(e => console.log("Taustavideon toistovirhe:", e));
+      } else if (kohde.kuva && kohde.kuva.trim() !== "") {
+        bgVideo.style.display = "none";
+        bgVideo.removeAttribute('src');
         modalBox.style.backgroundImage = `url('${kohde.kuva}')`;
       } else {
+        bgVideo.style.display = "none";
+        bgVideo.removeAttribute('src');
         modalBox.style.backgroundImage = "none";
         modalBox.style.backgroundColor = "#222";
       }
 
       modal.style.display = "flex";
 
+      const linnoitusLinkki = document.getElementById('linnoitus-linkki');
+      linnoitusLinkki.style.display = "none";
+      if (kohde.loppukohtaus) linnoitusLinkki.href = kohde.linkki;
+
+      // Puhuva Avatar -video
       if (kohde.video && kohde.video.trim() !== "") {
         videoPlayer.style.display = "block";
         videoPlayer.src = kohde.video;
@@ -312,43 +411,64 @@
         videoPlayer.play().catch(e => console.log("Videotoiston virhe:", e));
 
         videoPlayer.onended = function() {
-          suljeModal();
-          seuraavaKohdeAutomaatissa();
+          if (kohde.loppukohtaus) {
+            videoPlayer.style.display = "none";
+            document.getElementById('linnoitus-linkki').style.display = "block";
+          } else {
+            const seuraava = nykyinenIndex + 1;
+
+            // Jos seuraavana on Linnoituksen loppumainos, vaihda siihen suoraan.
+            // Näin kartta ei välähdä Ehrnroothin aukion ja Linnoituksen välissä.
+            if (seuraava < kohteet.length && kohteet[seuraava].loppukohtaus) {
+              nykyinenIndex = seuraava;
+              aktivoiMedia(kohteet[seuraava]);
+            } else {
+              suljeModal();
+              seuraavaKohdeAutomaatissa();
+            }
+          }
         };
 
         videoPlayer.onerror = function() {
-          console.log("Videota ei voitu toistaa:", kohde.video);
+          videoPlayer.style.display = "none";
+          if (kohde.loppukohtaus) {
+            document.getElementById('linnoitus-linkki').style.display = "block";
+          } else {
+            toistaPelkkaAudio(kohde);
+          }
+        };
+      } else {
+        videoPlayer.style.display = "none";
+        if (kohde.loppukohtaus) {
+          document.getElementById('linnoitus-linkki').style.display = "block";
+        } else {
+          toistaPelkkaAudio(kohde);
+        }
+      }
+    }
+
+    function toistaPelkkaAudio(kohde) {
+      if (kohde.audio && kohde.audio.trim() !== "") {
+        player.src = kohde.audio;
+        player.play().catch(e => {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        });
+
+        player.onended = function() {
           suljeModal();
           seuraavaKohdeAutomaatissa();
         };
 
+        player.onerror = function() {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        };
       } else {
-        videoPlayer.style.display = "none";
-
-        if (kohde.audio && kohde.audio.trim() !== "") {
-          player.src = kohde.audio;
-          player.play().catch(e => {
-            console.log("Toistovirhe:", kohde.audio);
-            suljeModal();
-            seuraavaKohdeAutomaatissa();
-          });
-
-          player.onended = function() {
-            suljeModal();
-            seuraavaKohdeAutomaatissa();
-          };
-
-          player.onerror = function() {
-            console.log("Äänitiedostoa ei löydy:", kohde.audio);
-            suljeModal();
-            seuraavaKohdeAutomaatissa();
-          };
-        } else {
-          meidanTimeout = setTimeout(() => {
-            suljeModal();
-            seuraavaKohdeAutomaatissa();
-          }, 3000);
-        }
+        meidanTimeout = setTimeout(() => {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        }, 3000);
       }
     }
 
@@ -358,9 +478,18 @@
     }
 
     function seuraavaKohdeAutomaatissa() {
-      if (isAutoplay && nykyinenIndex + 1 < kohteet.length) {
+      // Ehrnroothin aukion jälkeen näytetään aina Linnoituksen loppumainos.
+      const seuraava = nykyinenIndex + 1;
+      if (seuraava < kohteet.length && kohteet[seuraava].loppukohtaus) {
         meidanTimeout = setTimeout(() => {
-          siirryKohteeseen(nykyinenIndex + 1, false);
+          siirryKohteeseen(seuraava, true);
+        }, 1200);
+        return;
+      }
+
+      if (isAutoplay && seuraava < kohteet.length) {
+        meidanTimeout = setTimeout(() => {
+          siirryKohteeseen(seuraava, false);
         }, 1500);
       }
     }
@@ -370,6 +499,8 @@
       player.removeAttribute('src');
       videoPlayer.pause();
       videoPlayer.removeAttribute('src');
+      bgVideo.pause();
+      bgVideo.removeAttribute('src');
     }
 
     function pysaytaKaikki() {
