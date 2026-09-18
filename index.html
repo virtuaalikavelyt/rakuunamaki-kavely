@@ -90,21 +90,6 @@
     }
 
     @media (max-width: 600px) {
-      .modal-content {
-        width: 96%;
-        height: 72vh;
-        padding: 10px;
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-color: #111;
-      }
-
-      #bg-video {
-        object-fit: contain;
-        background: #111;
-      }
-
       #modal-video {
         right: auto;
         left: 6px;
@@ -128,6 +113,31 @@
   </style>
 </head>
 <body>
+
+  <div id="aloitus-huomautus" style="
+    position:fixed; inset:0; z-index:20000; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.72); padding:20px; box-sizing:border-box;">
+    <div style="width:min(620px,94vw); background:#fff; color:#222; border-radius:14px; padding:22px;
+                box-shadow:0 10px 35px rgba(0,0,0,.4); box-sizing:border-box;">
+      <div style="font-size:22px; font-weight:700; margin-bottom:12px;">Tervetuloa Rakuunamäelle</div>
+      <p style="margin:0 0 12px; font-size:15px; line-height:1.5;">
+        Tämä virtuaaliesittely on tehty Rakuunamäen GPS-äänikävelyn pohjalta.
+        Äänikävelyssä tarinat käynnistyvät automaattisesti, kun kuljet paikan päällä kohteelta toiselle.
+      </p>
+      <p style="margin:0; font-size:15px; line-height:1.5;">
+        Historiallisia tapahtumia on elävöitetty tekoälyllä luoduilla kuvituskuvilla.
+        Kuvien henkilöt, univormut ja muut yksityiskohdat ovat viitteellisiä eivätkä kaikilta osin
+        vastaa aikakauden historiallisia yksityiskohtia.
+      </p>
+      <button type="button" onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
+        style="display:block; width:100%; margin-top:18px; padding:12px 18px; font-size:16px;
+               font-weight:700; cursor:pointer; border-radius:8px; border:none;
+               background:#007bff; color:#fff;">
+        ▶ Aloita virtuaaliesittely
+      </button>
+    </div>
+  </div>
+
 
   <div id="map"></div>
 
@@ -181,8 +191,8 @@
         lng: 28.180214,
         audio: "",
         kuvaus: "Wäino Aaltosen 1963 pystyttämä muistomerkki ja Nikolain vallit.",
-        kuva: "muistomerkki.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
-        video: "patsas.webm"
+        kuva: "patsas1.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
+        video: "ratsuvaenpatsas_1080p.webm"
       },
       {
         nimi: "Rakuunamäen pääportti & Pave Maijanen",
@@ -208,7 +218,7 @@
         lng: 28.1774570,
         audio: "pohjustus.mp3",
         kuvaus: "Pohjustus ennen hotellia.",
-        kuva: "pohjustus.png",
+        kuva: "pohjustus1.mp4",
         video: "pohjustus.webm" 
       },
       {
@@ -217,7 +227,7 @@
         lng: 28.17633415,
         audio: "rakuunahotelli.mp3",
         kuvaus: "Rakuunahotelli.",
-        kuva: "hotellirakuuna.mp4",
+        kuva: "rakuunahotelli1.mp4",
         video: "rakuunahotelli.webm"
       },
       {
@@ -226,8 +236,8 @@
         lng: 28.175187,
         audio: "sotku.mp3",
         kuvaus: "Sotilaskoti eli Sotku.",
-        kuva: "sotku.mp4",
-        video: "sotku.webm"
+        kuva: "sotilaskoti.mp4",
+        video: "sotku3.webm"
       },
       {    
         nimi: "ruokala",
@@ -235,7 +245,7 @@
         lng: 28.1737116,
         audio: "ruokala.mp3",
         kuvaus: "Kasarmin ruokala.",
-        kuva: "ruokala.mp4",
+        kuva: "ruokala1.mp4",
         video: "ruokala.webm"
       },
       { 
@@ -244,8 +254,8 @@
         lng: 28.173163,
         audio: "chymosportti.mp3",
         kuvaus: "Chymoksen tehtaan portti.",
-        kuva: "chymosportti.mp4",
-        video: "chymosportti.webm"
+        kuva: "chymoksenportti1.mp4",
+        video: "Chymoksenportti.webm"
       },
       { 
         nimi: "chymos",
@@ -280,7 +290,7 @@
         lng: 28.174944,
         audio: "Adolf Ehrnroothin aukio.mp3",
         kuvaus: "Rakuunamäen keskusaukio ja päätepiste.",
-        kuva: "keskusaukio.mp4",
+        kuva: "aukio2.mp4",
         video: "aukio.webm"
       },
       {
@@ -291,8 +301,8 @@
         kuva: "linnoitus_loppu.png",
         video: "lara_linnoitus.webm",
         // ↓↓↓ LIITÄ LINNOITUKSEN ECHOES-KÄVELYN LINKKI ALLA OLEVIEN LAINAUSMERKKIEN VÄLIIN ↓↓↓
-         // Esimerkki: linkki: "https://explore.echoes.xyz/collections/GCyRId4eGQP7n8Nv.",
-         linkki: "https://explore.echoes.xyz/collections/GCyRId4eGQP7n8Nv"
+         // Esimerkki: linkki: "",
+         linkki: "https://explore.echoes.xyz/collections/GCyRId4eGQP7n8Nv",
       }
     ];
 
