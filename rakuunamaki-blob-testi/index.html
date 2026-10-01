@@ -357,13 +357,28 @@
 
     function esilataaKohde(kohde) {
       if (!kohde) return;
-      if (kohde.kuva && kohde.kuva.toLowerCase().endsWith(".mp4")) esilataaBlob(kohde.kuva);
+      // Myös PNG/JPG/WebP-kuvat esiladataan, jotta mustaa välähdystä ei synny.
+      if (kohde.kuva && kohde.kuva.trim() !== "") esilataaBlob(kohde.kuva);
       if (kohde.video && kohde.video.trim() !== "") esilataaBlob(kohde.video);
     }
 
     function mediaSrc(url) {
       return mediaBlobCache.get(url) || url;
     }
+
+    async function esilataaAlku() {
+      const status = document.getElementById("preload-status");
+      if (status) status.textContent = "Valmistellaan esittelyä…";
+      const eka = kohteet[0];
+      const ekaMedia = [eka && eka.kuva, eka && eka.video].filter(Boolean);
+      await Promise.all(ekaMedia.map(esilataaBlob));
+      if (status) status.textContent = "Esittely valmis.";
+      // Toinen kohde alkaa latautua taustalla, mutta ei estä aloitusta.
+      esilataaKohde(kohteet[1]);
+    }
+
+    // Käytetään alun tekstiin kuluva aika hyödyksi.
+    esilataaAlku();
 
     function siirryKohteeseen(index, suoraan) {
       pysaytaMedia();
@@ -442,7 +457,7 @@
       } else if (kohde.kuva && kohde.kuva.trim() !== "") {
         bgVideo.style.display = "none";
         bgVideo.removeAttribute('src');
-        modalBox.style.backgroundImage = `url('${kohde.kuva}')`;
+        modalBox.style.backgroundImage = `url('${mediaSrc(kohde.kuva)}')`;
       } else {
         bgVideo.style.display = "none";
         bgVideo.removeAttribute('src');
