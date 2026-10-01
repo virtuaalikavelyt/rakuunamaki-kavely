@@ -177,6 +177,10 @@
 
   <audio id="audio-player" preload="auto"></audio>
 
+  <!-- Seuraavan Laran WebM:n piilotettu esilämmitys: selain ehtii purkaa ensimmäisen kuvan valmiiksi. -->
+  <video id="lara-prewarm" muted playsinline preload="auto"
+         style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;bottom:-10px;"></video>
+
   <script>
     const map = L.map('map').setView([61.0594, 28.1775], 17);
     
@@ -315,6 +319,41 @@
     const bgVideo = document.getElementById('bg-video');
     const modal = document.getElementById('media-modal');
     const modalBox = document.getElementById('modal-box');
+    const laraPrewarm = document.getElementById('lara-prewarm');
+    let prewarmUrl = "";
+
+    async function esilammitaLara(kohde) {
+      if (!kohde || !kohde.video) return;
+      try {
+        await esilataaBlob(kohde.video);
+        const src = mediaSrc(kohde.video);
+        if (prewarmUrl === src && laraPrewarm.readyState >= 2) return;
+
+        prewarmUrl = src;
+        laraPrewarm.pause();
+        laraPrewarm.src = src;
+        laraPrewarm.load();
+
+        // Mute mahdollistaa esikäynnistyksen useimmissa mobiiliselaimissa.
+        // Kun ensimmäinen kuvakehys on purettu, video pysäytetään valmiiksi odottamaan.
+        const valmis = () => {
+          try { laraPrewarm.pause(); laraPrewarm.currentTime = 0; } catch (e) {}
+        };
+        laraPrewarm.addEventListener('loadeddata', valmis, { once: true });
+        const p = laraPrewarm.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            if (typeof laraPrewarm.requestVideoFrameCallback === 'function') {
+              laraPrewarm.requestVideoFrameCallback(() => valmis());
+            } else {
+              setTimeout(valmis, 120);
+            }
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.log("Laran esilämmitys ohitettiin:", e);
+      }
+    }
 
     const hahmoIcon = L.divIcon({
       className: 'custom-runner-icon',
@@ -382,10 +421,11 @@
       if (status) status.textContent = "Valmistellaan esittelyä…";
       const eka = kohteet[0];
       await esilataaKohde(eka);
+      esilammitaLara(eka);
       if (status) status.textContent = "Esittely valmis.";
       // Toisen kohteen lataus alkaa vasta ensimmäisen valmistuttua,
       // jotta ensimmäinen kohde saa kaiken mobiilidatan käyttöönsä.
-      esilataaKohde(kohteet[1]);
+      esilataaKohde(kohteet[1]).then(() => esilammitaLara(kohteet[1]));
     }
 
     // Käytetään alun tekstiin kuluva aika hyödyksi.
@@ -403,7 +443,7 @@
       // Seuraava kohde aloitetaan myös jo nyt, jotta sitä ei tarvitse
       // hakea vasta nykyisen kohteen lopussa.
       if (index + 1 < kohteet.length) {
-        esilataaKohde(kohteet[index + 1]);
+        esilataaKohde(kohteet[index + 1]).then(() => esilammitaLara(kohteet[index + 1]));
       }
 
       // Linnoitus on erillinen loppukortti: karttahahmo jää Ehrnroothin aukiolle.
@@ -490,8 +530,9 @@
       // Puhuva Avatar -video
       if (kohde.video && kohde.video.trim() !== "") {
         videoPlayer.style.display = "block";
-        videoPlayer.src = mediaSrc(kohde.video);
-        
+        const laraSrc = mediaSrc(kohde.video);
+        videoPlayer.src = laraSrc;
+        videoPlayer.load();
         videoPlayer.play().catch(e => console.log("Videotoiston virhe:", e));
 
         videoPlayer.onended = function() {
