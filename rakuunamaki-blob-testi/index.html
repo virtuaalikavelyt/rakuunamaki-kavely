@@ -129,11 +129,14 @@
         Kuvien henkilöt, univormut ja muut yksityiskohdat ovat viitteellisiä eivätkä kaikilta osin
         vastaa aikakauden historiallisia yksityiskohtia.
       </p>
-      <button type="button" onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
-        style="display:block; width:100%; margin-top:18px; padding:12px 18px; font-size:16px;
-               font-weight:700; cursor:pointer; border-radius:8px; border:none;
-               background:#007bff; color:#fff;">
-        ▶ Aloita virtuaaliesittely
+      <div id="preload-status" style="margin-top:16px; font-size:14px; text-align:center; color:#555;">
+        Valmistellaan esittelyä…
+      </div>
+      <button id="aloita-painike" type="button" disabled onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
+        style="display:block; width:100%; margin-top:10px; padding:12px 18px; font-size:16px;
+               font-weight:700; cursor:not-allowed; border-radius:8px; border:none;
+               background:#8a8a8a; color:#fff; opacity:.75;">
+        ⏳ Valmistellaan…
       </button>
     </div>
   </div>
@@ -418,14 +421,28 @@
 
     async function esilataaAlku() {
       const status = document.getElementById("preload-status");
-      if (status) status.textContent = "Valmistellaan esittelyä…";
-      const eka = kohteet[0];
-      await esilataaKohde(eka);
-      esilammitaLara(eka);
-      if (status) status.textContent = "Esittely valmis.";
-      // Toisen kohteen lataus alkaa vasta ensimmäisen valmistuttua,
-      // jotta ensimmäinen kohde saa kaiken mobiilidatan käyttöönsä.
-      esilataaKohde(kohteet[1]).then(() => esilammitaLara(kohteet[1]));
+      const painike = document.getElementById("aloita-painike");
+      if (status) status.textContent = "Valmistellaan esittelyä… 0/4";
+
+      // TESTI: ladataan neljä ensimmäistä kohdetta kokonaan ennen aloitusta.
+      // Näin myös Pohjustuksen media on jo muistissa ennen kuin käyttäjä aloittaa.
+      for (let i = 0; i < 4; i++) {
+        await esilataaKohde(kohteet[i]);
+        esilammitaLara(kohteet[i]);
+        if (status) status.textContent = `Valmistellaan esittelyä… ${i + 1}/4`;
+      }
+
+      if (status) status.textContent = "Esittely valmis – voit aloittaa.";
+      if (painike) {
+        painike.disabled = false;
+        painike.textContent = "▶ Aloita virtuaaliesittely";
+        painike.style.cursor = "pointer";
+        painike.style.background = "#007bff";
+        painike.style.opacity = "1";
+      }
+
+      // Jatketaan viidennen kohteen lataamista taustalla.
+      if (kohteet[4]) esilataaKohde(kohteet[4]).then(() => esilammitaLara(kohteet[4]));
     }
 
     // Käytetään alun tekstiin kuluva aika hyödyksi.
