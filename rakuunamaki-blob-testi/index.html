@@ -129,14 +129,11 @@
         Kuvien henkilöt, univormut ja muut yksityiskohdat ovat viitteellisiä eivätkä kaikilta osin
         vastaa aikakauden historiallisia yksityiskohtia.
       </p>
-      <div id="preload-status" style="margin-top:16px; font-size:14px; text-align:center; color:#555;">
-        Valmistellaan esittelyä…
-      </div>
-      <button id="aloita-painike" type="button" disabled onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
-        style="display:block; width:100%; margin-top:10px; padding:12px 18px; font-size:16px;
-               font-weight:700; cursor:not-allowed; border-radius:8px; border:none;
-               background:#8a8a8a; color:#fff; opacity:.75;">
-        ⏳ Valmistellaan…
+      <button type="button" onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
+        style="display:block; width:100%; margin-top:18px; padding:12px 18px; font-size:16px;
+               font-weight:700; cursor:pointer; border-radius:8px; border:none;
+               background:#007bff; color:#fff;">
+        ▶ Aloita virtuaaliesittely
       </button>
     </div>
   </div>
@@ -179,10 +176,6 @@
   </div>
 
   <audio id="audio-player" preload="auto"></audio>
-
-  <!-- Seuraavan Laran WebM:n piilotettu esilämmitys: selain ehtii purkaa ensimmäisen kuvan valmiiksi. -->
-  <video id="lara-prewarm" muted playsinline preload="auto"
-         style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;bottom:-10px;"></video>
 
   <script>
     const map = L.map('map').setView([61.0594, 28.1775], 17);
@@ -322,41 +315,6 @@
     const bgVideo = document.getElementById('bg-video');
     const modal = document.getElementById('media-modal');
     const modalBox = document.getElementById('modal-box');
-    const laraPrewarm = document.getElementById('lara-prewarm');
-    let prewarmUrl = "";
-
-    async function esilammitaLara(kohde) {
-      if (!kohde || !kohde.video) return;
-      try {
-        await esilataaBlob(kohde.video);
-        const src = mediaSrc(kohde.video);
-        if (prewarmUrl === src && laraPrewarm.readyState >= 2) return;
-
-        prewarmUrl = src;
-        laraPrewarm.pause();
-        laraPrewarm.src = src;
-        laraPrewarm.load();
-
-        // Mute mahdollistaa esikäynnistyksen useimmissa mobiiliselaimissa.
-        // Kun ensimmäinen kuvakehys on purettu, video pysäytetään valmiiksi odottamaan.
-        const valmis = () => {
-          try { laraPrewarm.pause(); laraPrewarm.currentTime = 0; } catch (e) {}
-        };
-        laraPrewarm.addEventListener('loadeddata', valmis, { once: true });
-        const p = laraPrewarm.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => {
-            if (typeof laraPrewarm.requestVideoFrameCallback === 'function') {
-              laraPrewarm.requestVideoFrameCallback(() => valmis());
-            } else {
-              setTimeout(valmis, 120);
-            }
-          }).catch(() => {});
-        }
-      } catch (e) {
-        console.log("Laran esilämmitys ohitettiin:", e);
-      }
-    }
 
     const hahmoIcon = L.divIcon({
       className: 'custom-runner-icon',
@@ -383,89 +341,15 @@
       siirryKohteeseen(0, true);
     }
 
-    const mediaBlobCache = new Map();
-    const mediaBlobPromises = new Map();
-
-    async function esilataaBlob(url) {
-      if (!url) return;
-      if (mediaBlobCache.has(url)) return;
-      if (mediaBlobPromises.has(url)) return mediaBlobPromises.get(url);
-
-      const promise = (async () => {
-        try {
-          const vastaus = await fetch(url, { cache: "force-cache" });
-          if (!vastaus.ok) return;
-          const blob = await vastaus.blob();
-          mediaBlobCache.set(url, URL.createObjectURL(blob));
-        } catch (e) {
-          console.log("Esilataus ohitettiin:", url, e);
-        } finally {
-          mediaBlobPromises.delete(url);
-        }
-      })();
-
-      mediaBlobPromises.set(url, promise);
-      return promise;
-    }
-
-    async function esilataaKohde(kohde) {
-      if (!kohde) return;
-      // Myös PNG/JPG/WebP-kuvat esiladataan.
-      const media = [kohde.kuva, kohde.video].filter(Boolean);
-      await Promise.all(media.map(esilataaBlob));
-    }
-
-    function mediaSrc(url) {
-      return mediaBlobCache.get(url) || url;
-    }
-
-    async function esilataaAlku() {
-      const status = document.getElementById("preload-status");
-      const painike = document.getElementById("aloita-painike");
-      if (status) status.textContent = "Valmistellaan esittelyä… 0/4";
-
-      // TESTI: ladataan neljä ensimmäistä kohdetta kokonaan ennen aloitusta.
-      // Näin myös Pohjustuksen media on jo muistissa ennen kuin käyttäjä aloittaa.
-      for (let i = 0; i < 4; i++) {
-        await esilataaKohde(kohteet[i]);
-        esilammitaLara(kohteet[i]);
-        if (status) status.textContent = `Valmistellaan esittelyä… ${i + 1}/4`;
-      }
-
-      if (status) status.textContent = "Esittely valmis – voit aloittaa.";
-      if (painike) {
-        painike.disabled = false;
-        painike.textContent = "▶ Aloita virtuaaliesittely";
-        painike.style.cursor = "pointer";
-        painike.style.background = "#007bff";
-        painike.style.opacity = "1";
-      }
-
-      // Jatketaan viidennen kohteen lataamista taustalla.
-      if (kohteet[4]) esilataaKohde(kohteet[4]).then(() => esilammitaLara(kohteet[4]));
-    }
-
-    // Käytetään alun tekstiin kuluva aika hyödyksi.
-    esilataaAlku();
-
     function siirryKohteeseen(index, suoraan) {
       pysaytaMedia();
       if (meidanTimeout) clearTimeout(meidanTimeout);
       nykyinenIndex = index;
       const kohde = kohteet[index];
 
-      // Aloitetaan tämän kohteen lataus heti, ennen karttaliikettä.
-      const kohdeValmis = esilataaKohde(kohde);
-
-      // Seuraava kohde aloitetaan myös jo nyt, jotta sitä ei tarvitse
-      // hakea vasta nykyisen kohteen lopussa.
-      if (index + 1 < kohteet.length) {
-        esilataaKohde(kohteet[index + 1]).then(() => esilammitaLara(kohteet[index + 1]));
-      }
-
       // Linnoitus on erillinen loppukortti: karttahahmo jää Ehrnroothin aukiolle.
       if (kohde.loppukohtaus) {
-        kohdeValmis.then(() => aktivoiMedia(kohde));
+        aktivoiMedia(kohde);
         return;
       }
 
@@ -475,7 +359,7 @@
       if (suoraan) {
         hahmoMarker.setLatLng(maali);
         map.flyTo(maali, 18, { duration: 1.2 });
-        kohdeValmis.then(() => aktivoiMedia(kohde));
+        aktivoiMedia(kohde);
       } else {
         let startTime = null;
         const kesto = 3500;
@@ -495,7 +379,7 @@
             animationFrame = requestAnimationFrame(animate);
           } else {
             map.flyTo(maali, 18, { duration: 1.0 });
-            kohdeValmis.then(() => aktivoiMedia(kohde));
+            aktivoiMedia(kohde);
           }
         }
         animationFrame = requestAnimationFrame(animate);
@@ -525,12 +409,12 @@
       if (kohde.kuva && kohde.kuva.toLowerCase().endsWith('.mp4')) {
         modalBox.style.backgroundImage = "none";
         bgVideo.style.display = "block";
-        bgVideo.src = mediaSrc(kohde.kuva);
+        bgVideo.src = kohde.kuva;
         bgVideo.play().catch(e => console.log("Taustavideon toistovirhe:", e));
       } else if (kohde.kuva && kohde.kuva.trim() !== "") {
         bgVideo.style.display = "none";
         bgVideo.removeAttribute('src');
-        modalBox.style.backgroundImage = `url('${mediaSrc(kohde.kuva)}')`;
+        modalBox.style.backgroundImage = `url('${kohde.kuva}')`;
       } else {
         bgVideo.style.display = "none";
         bgVideo.removeAttribute('src');
@@ -547,9 +431,8 @@
       // Puhuva Avatar -video
       if (kohde.video && kohde.video.trim() !== "") {
         videoPlayer.style.display = "block";
-        const laraSrc = mediaSrc(kohde.video);
-        videoPlayer.src = laraSrc;
-        videoPlayer.load();
+        videoPlayer.src = kohde.video;
+        
         videoPlayer.play().catch(e => console.log("Videotoiston virhe:", e));
 
         videoPlayer.onended = function() {
