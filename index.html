@@ -341,39 +341,11 @@
       siirryKohteeseen(0, true);
     }
 
-    const mediaBlobCache = new Map();
-
-    async function esilataaBlob(url) {
-      if (!url || mediaBlobCache.has(url)) return;
-      try {
-        const vastaus = await fetch(url, { cache: "force-cache" });
-        if (!vastaus.ok) return;
-        const blob = await vastaus.blob();
-        mediaBlobCache.set(url, URL.createObjectURL(blob));
-      } catch (e) {
-        console.log("Esilataus ohitettiin:", url, e);
-      }
-    }
-
-    function esilataaKohde(kohde) {
-      if (!kohde) return;
-      if (kohde.kuva && kohde.kuva.toLowerCase().endsWith(".mp4")) esilataaBlob(kohde.kuva);
-      if (kohde.video && kohde.video.trim() !== "") esilataaBlob(kohde.video);
-    }
-
-    function mediaSrc(url) {
-      return mediaBlobCache.get(url) || url;
-    }
-
     function siirryKohteeseen(index, suoraan) {
       pysaytaMedia();
       if (meidanTimeout) clearTimeout(meidanTimeout);
       nykyinenIndex = index;
       const kohde = kohteet[index];
-
-      // Lataa kohteen raskaat mediat jo karttaliikkeen aikana selaimen muistiin.
-      // Jos lataus ei ehdi valmiiksi, normaali URL toimii varajärjestelmänä.
-      esilataaKohde(kohde);
 
       // Linnoitus on erillinen loppukortti: karttahahmo jää Ehrnroothin aukiolle.
       if (kohde.loppukohtaus) {
@@ -437,7 +409,7 @@
       if (kohde.kuva && kohde.kuva.toLowerCase().endsWith('.mp4')) {
         modalBox.style.backgroundImage = "none";
         bgVideo.style.display = "block";
-        bgVideo.src = mediaSrc(kohde.kuva);
+        bgVideo.src = kohde.kuva;
         bgVideo.play().catch(e => console.log("Taustavideon toistovirhe:", e));
       } else if (kohde.kuva && kohde.kuva.trim() !== "") {
         bgVideo.style.display = "none";
@@ -459,14 +431,9 @@
       // Puhuva Avatar -video
       if (kohde.video && kohde.video.trim() !== "") {
         videoPlayer.style.display = "block";
-        videoPlayer.src = mediaSrc(kohde.video);
+        videoPlayer.src = kohde.video;
         
         videoPlayer.play().catch(e => console.log("Videotoiston virhe:", e));
-
-        // Nykyisen Laran puhuessa ladataan jo seuraavan pisteen media.
-        if (nykyinenIndex + 1 < kohteet.length) {
-          esilataaKohde(kohteet[nykyinenIndex + 1]);
-        }
 
         videoPlayer.onended = function() {
           if (kohde.loppukohtaus) {
