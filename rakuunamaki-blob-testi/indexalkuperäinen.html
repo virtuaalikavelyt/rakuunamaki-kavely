@@ -341,13 +341,6 @@
       siirryKohteeseen(0, true);
     }
 
-    // Tervetuloa-ruudun lukemisen aikana ladataan jo kaksi ensimmäistä kohdetta.
-    // Näin ensimmäisen Laran pitäisi käynnistyä mahdollisimman valmiista välimuistista.
-    window.addEventListener('load', () => {
-      esilataaKohde(kohteet[0]);
-      esilataaKohde(kohteet[1]);
-    });
-
     // Esilataus ilman Blob-välimuistia:
     // selain saa ladata seuraavan kohteen mediat omaan normaaliin HTTP-välimuistiinsa.
     const preloadCache = new Map();
