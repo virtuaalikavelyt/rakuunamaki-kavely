@@ -101,20 +101,6 @@
       }
     }
 
-    /* Koko esityksen koko näyttö, ei selaimen oma videosoitin. */
-    #fullscreen-btn { position:absolute; top:12px; right:56px; z-index:10001;
-      width:38px; height:36px; padding:0; font-size:21px; background:#1765b5;
-      border-radius:7px; }
-    html:fullscreen #media-modal, html:-webkit-full-screen #media-modal { width:100%; height:100%; }
-    html:fullscreen .modal-content, html:-webkit-full-screen .modal-content {
-      width:min(96vw,1100px); max-width:none; height:96vh; max-height:none;
-    }
-    html.kokonaytto-varatila #media-modal { position:fixed; inset:0; width:100vw; height:100dvh; }
-    html.kokonaytto-varatila .modal-content { width:min(96vw,1100px); max-width:none; height:96dvh; }
-    @media (orientation:landscape) {
-      html:fullscreen .modal-content, html:-webkit-full-screen .modal-content,
-      html.kokonaytto-varatila .modal-content { width:min(96vw,1200px); height:96dvh; }
-    }
     .close-btn {
       position: absolute;
       top: 12px; right: 12px;
@@ -126,6 +112,27 @@
       z-index: 10000;
     }
     .close-btn:hover { background: #cc0000; }
+
+    /* Koko esityksen suurennus, ei selaimen omaa videosoitinta. */
+    #fullscreen-btn { background:#176e7c; }
+    #modal-fullscreen-btn { position:absolute; top:12px; right:56px; z-index:10001; background:#176e7c; padding:8px 11px; font-size:18px; }
+    #media-modal:fullscreen, #media-modal:-webkit-full-screen,
+    #media-modal.laajennettu { width:100%; height:100%; inset:0; background:#000; }
+    #media-modal:fullscreen .modal-content,
+    #media-modal:-webkit-full-screen .modal-content,
+    #media-modal.laajennettu .modal-content {
+      width:100%; height:100%; max-width:none; max-height:none;
+      border:0; border-radius:0; box-shadow:none; padding:0;
+    }
+    @media (orientation: landscape) {
+      #media-modal .modal-content { width:96vw; height:94dvh; max-width:none; }
+      #media-modal:fullscreen .modal-content,
+      #media-modal:-webkit-full-screen .modal-content,
+      #media-modal.laajennettu .modal-content { width:100vw; height:100dvh; }
+      #media-modal #lara-dual-canvas { height:72%; max-width:36%; left:3%; bottom:2%; }
+      #media-modal #modal-video { height:72%; max-width:36%; left:3%; bottom:2%; }
+      #media-modal #modal-info-panel { max-width:65%; }
+    }
   </style>
 </head>
 <body>
@@ -160,7 +167,7 @@
   <div id="controls">
     <button onclick="aloitaAutomaatti()">▶ Katso Virtuaaliesittely</button>
     <button onclick="pysaytaKaikki()">⏹ Pysäytä</button>
-    <button id="fullscreen-main-btn" onclick="vaihdaKokoNaytto()">⛶ Koko näyttö</button>
+    <button id="fullscreen-btn" onclick="vaihdaKokoNaytto()">⛶ Koko näyttö</button>
   </div>
 
   <div id="info-box">
@@ -175,11 +182,11 @@
       <!-- Taustavideo -->
       <video id="bg-video" autoplay loop muted playsinline></video>
       
-      <button id="fullscreen-btn" type="button" onclick="vaihdaKokoNaytto()" aria-label="Koko näyttö" title="Koko näyttö">⛶</button>
+      <button id="modal-fullscreen-btn" onclick="vaihdaKokoNaytto()" aria-label="Koko näyttö">⛶</button>
       <button class="close-btn" onclick="suljeModal()">✕</button>
       
       <!-- Puhuva Avatar -video -->
-      <video id="modal-video" autoplay playsinline webkit-playsinline controlslist="nofullscreen" disablepictureinpicture></video>
+      <video id="modal-video" autoplay playsinline webkit-playsinline></video>
       <canvas id="lara-dual-canvas" width="540" height="960"></canvas>
       <video id="lara-dual-video" playsinline webkit-playsinline preload="auto" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
       
@@ -387,6 +394,40 @@
       });
     });
 
+    function paivitaKokoNaytonPainikkeet() {
+      const laaja = !!document.fullscreenElement || modal.classList.contains('laajennettu');
+      document.getElementById('fullscreen-btn').textContent = laaja ? '⛶ Poistu koko näytöstä' : '⛶ Koko näyttö';
+      document.getElementById('modal-fullscreen-btn').textContent = laaja ? '⤢' : '⛶';
+    }
+
+    function vaihdaKokoNaytto() {
+      const aktiivinen = !!document.fullscreenElement || modal.classList.contains('laajennettu');
+      if (aktiivinen) {
+        modal.classList.remove('laajennettu');
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        paivitaKokoNaytonPainikkeet();
+        return;
+      }
+      // Selain hyväksyy koko näytön pyynnön vain painalluksesta.
+      // Jos selain (esim. iPhone Safari) ei tue elementin fullscreenia,
+      // suurennetaan koko esitys CSS:llä.
+      modal.classList.add('laajennettu');
+      if (modal.style.display === 'none' || !modal.style.display) modal.style.display = 'flex';
+      if (modal.requestFullscreen) {
+        modal.requestFullscreen({navigationUI:'hide'}).catch(() => {
+          modal.classList.add('laajennettu');
+          paivitaKokoNaytonPainikkeet();
+        });
+      }
+      paivitaKokoNaytonPainikkeet();
+    }
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) modal.classList.remove('laajennettu');
+      paivitaKokoNaytonPainikkeet();
+    });
+
     function aloitaAutomaatti() {
       isAutoplay = true;
       siirryKohteeseen(0, true);
@@ -501,6 +542,11 @@
         }, 1000);
       }, 5000);
 
+      // Poista edellisen kohteen tausta ennen uuden näyttämistä.
+      bgVideo.pause();
+      bgVideo.style.display = 'none';
+      bgVideo.removeAttribute('src');
+      modalBox.style.backgroundImage = 'none';
       // Tarkistetaan onko kuva-kentässä taustavideo (.mp4) vai valokuva (.jpg/.png)
       if (kohde.kuva && kohde.kuva.toLowerCase().endsWith('.mp4')) {
         modalBox.style.backgroundImage = "none";
@@ -532,10 +578,17 @@
         try {
           if (!dualRenderer) dualRenderer = luoDualPiirto();
           dualVideo.onended = () => {
-            dualCanvas.style.display = 'none';
             if (kohde.loppukohtaus) {
+              dualCanvas.style.display = 'none';
               document.getElementById('linnoitus-linkki').style.display = 'block';
+            } else if (kohteet[nykyinenIndex + 1]?.loppukohtaus) {
+              // Aukio -> Linnoitus suoraan saman avoimen ikkunan sisällä.
+              const seuraava = nykyinenIndex + 1;
+              nykyinenIndex = seuraava;
+              pysaytaMedia();
+              aktivoiMedia(kohteet[seuraava]);
             } else {
+              dualCanvas.style.display = 'none';
               suljeModal();
               seuraavaKohdeAutomaatissa();
             }
@@ -658,9 +711,9 @@
       // Ehrnroothin aukion jälkeen näytetään aina Linnoituksen loppumainos.
       const seuraava = nykyinenIndex + 1;
       if (seuraava < kohteet.length && kohteet[seuraava].loppukohtaus) {
-        meidanTimeout = setTimeout(() => {
-          siirryKohteeseen(seuraava, true);
-        }, 1200);
+        nykyinenIndex = seuraava;
+        pysaytaMedia();
+        aktivoiMedia(kohteet[seuraava]);
         return;
       }
 
@@ -684,6 +737,9 @@
     }
 
     function pysaytaKaikki() {
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      modal.classList.remove('laajennettu');
+      paivitaKokoNaytonPainikkeet();
       isAutoplay = false;
       if (animationFrame) cancelAnimationFrame(animationFrame);
       if (meidanTimeout) clearTimeout(meidanTimeout);
