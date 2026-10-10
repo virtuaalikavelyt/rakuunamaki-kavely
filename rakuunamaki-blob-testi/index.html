@@ -89,7 +89,9 @@
       filter: drop-shadow(0 5px 10px rgba(0,0,0,0.55));
     }
 
+    #lara-dual-canvas { position:absolute; z-index:5; left:12px; bottom:18px; height:58%; max-width:42%; width:auto; aspect-ratio:9/16; display:none; pointer-events:none; filter:drop-shadow(0 5px 10px rgba(0,0,0,.55)); }
     @media (max-width: 600px) {
+      #lara-dual-canvas {left:6px; bottom:12px; height:54%; max-width:46%;}
       #modal-video {
         right: auto;
         left: 6px;
@@ -162,6 +164,8 @@
       
       <!-- Puhuva Avatar -video -->
       <video id="modal-video" autoplay controls playsinline></video>
+      <canvas id="lara-dual-canvas" width="540" height="960"></canvas>
+      <video id="lara-dual-video" playsinline webkit-playsinline preload="auto" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
       
       <!-- Kohteen nimi ja kuvaus: näkyy alussa 5 sekuntia ja häviää pehmeästi -->
       <div id="modal-info-panel" style="position: absolute; left: 20px; right: 20px; bottom: 12px; z-index: 6; background: rgba(0, 0, 0, 0.72); padding: 7px 12px; border-radius: 7px; backdrop-filter: blur(4px); opacity: 1; transition: opacity 1s ease;">
@@ -210,7 +214,8 @@
         audio: "putka.mp3",
         kuvaus: "Päävartiorakennus ja putka.",
         kuva: "putka.png",
-        video: "paavartio.webm"
+        video: "paavartio.webm",
+         dual: "lara_dual_full.mp4"
       },
       {
         nimi: "pohjustus ennen rakuunahotellia",
@@ -313,6 +318,24 @@
     const player = document.getElementById('audio-player');
     const videoPlayer = document.getElementById('modal-video');
     const bgVideo = document.getElementById('bg-video');
+     const dualVideo = document.getElementById('lara-dual-video');
+     const dualCanvas = document.getElementById('lara-dual-canvas');
+     let dualRenderer = null, dualFrameId = null;
+     function luoDualPiirto() {
+       const gl=dualCanvas.getContext('webgl',{alpha:true,premultipliedAlpha:false});
+       if(!gl)throw Error('WebGL ei käytettävissä');
+       const vs='attribute vec2 p; varying vec2 uv; void main(){gl_Position=vec4(p,0.,1.);uv=(p+1.)*.5;}';
+       const fs='precision mediump float; varying vec2 uv; uniform sampler2D tex; void main(){vec2 xy=vec2(uv.x*.5,1.-uv.y);vec3 rgb=texture2D(tex,xy).rgb;vec3 mask=texture2D(tex,vec2(xy.x+.5,xy.y)).rgb;float a=dot(mask,vec3(.299,.587,.114));gl_FragColor=vec4(rgb,a);}';
+       function sh(type,src){const a=gl.createShader(type);gl.shaderSource(a,src);gl.compileShader(a);if(!gl.getShaderParameter(a,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(a));return a}
+       const program=gl.createProgram();gl.attachShader(program,sh(gl.VERTEX_SHADER,vs));gl.attachShader(program,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+       const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+       const loc=gl.getAttribLocation(program,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+       const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+       gl.clearColor(0,0,0,0);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+       return ()=>{if(dualVideo.readyState>=2){gl.clear(gl.COLOR_BUFFER_BIT);gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,dualVideo);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}};
+     }
+     function piirraDual(){if(dualVideo.paused||dualVideo.ended)return;try{dualRenderer();dualFrameId=requestAnimationFrame(piirraDual)}catch(e){console.error('Lara-piirto:',e);dualVideo.pause()}}
+
     const modal = document.getElementById('media-modal');
     const modalBox = document.getElementById('modal-box');
 
@@ -373,7 +396,8 @@
     function esilataaKohde(kohde) {
       if (!kohde) return;
       if (kohde.kuva) esilataaMedia(kohde.kuva);
-      if (kohde.video && kohde.video.trim() !== "") esilataaMedia(kohde.video);
+       if (kohde.dual) esilataaMedia(kohde.dual);
+       else if (kohde.video && kohde.video.trim() !== "") esilataaMedia(kohde.video);
     }
 
     function mediaSrc(url) {
@@ -472,6 +496,20 @@
       linnoitusLinkki.style.display = "none";
       if (kohde.loppukohtaus) linnoitusLinkki.href = kohde.linkki;
 
+      // Kaksoiskuva-MP4 vain Päävartion testissä; muut kohteet ennallaan.
+      if (kohde.dual) {
+        videoPlayer.style.display='none';
+        dualCanvas.style.display='block';
+        try {
+          if (!dualRenderer) dualRenderer=luoDualPiirto();
+          dualVideo.src=mediaSrc(kohde.dual);
+          dualVideo.onended=()=>{suljeModal();seuraavaKohdeAutomaatissa()};
+          dualVideo.onerror=()=>{dualCanvas.style.display='none';toistaPelkkaAudio(kohde)};
+          dualVideo.play().then(()=>piirraDual()).catch(e=>{console.warn(e);dualCanvas.style.display='none';toistaPelkkaAudio(kohde)});
+        } catch(e) {console.error(e);dualCanvas.style.display='none';toistaPelkkaAudio(kohde)}
+        return;
+      }
+      dualCanvas.style.display='none';
       // Puhuva Avatar -video
       if (kohde.video && kohde.video.trim() !== "") {
         videoPlayer.style.display = "block";
@@ -569,6 +607,9 @@
     }
 
     function pysaytaMedia() {
+       if(dualFrameId!==null){cancelAnimationFrame(dualFrameId);dualFrameId=null}
+       dualVideo.pause();dualVideo.removeAttribute('src');dualVideo.onended=null;dualVideo.onerror=null;
+       dualCanvas.style.display='none';
       player.pause();
       player.removeAttribute('src');
       videoPlayer.pause();
