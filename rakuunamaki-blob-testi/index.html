@@ -101,6 +101,20 @@
       }
     }
 
+    /* Koko esityksen koko näyttö, ei selaimen oma videosoitin. */
+    #fullscreen-btn { position:absolute; top:12px; right:56px; z-index:10001;
+      width:38px; height:36px; padding:0; font-size:21px; background:#1765b5;
+      border-radius:7px; }
+    html:fullscreen #media-modal, html:-webkit-full-screen #media-modal { width:100%; height:100%; }
+    html:fullscreen .modal-content, html:-webkit-full-screen .modal-content {
+      width:min(96vw,1100px); max-width:none; height:96vh; max-height:none;
+    }
+    html.kokonaytto-varatila #media-modal { position:fixed; inset:0; width:100vw; height:100dvh; }
+    html.kokonaytto-varatila .modal-content { width:min(96vw,1100px); max-width:none; height:96dvh; }
+    @media (orientation:landscape) {
+      html:fullscreen .modal-content, html:-webkit-full-screen .modal-content,
+      html.kokonaytto-varatila .modal-content { width:min(96vw,1200px); height:96dvh; }
+    }
     .close-btn {
       position: absolute;
       top: 12px; right: 12px;
@@ -146,6 +160,7 @@
   <div id="controls">
     <button onclick="aloitaAutomaatti()">▶ Katso Virtuaaliesittely</button>
     <button onclick="pysaytaKaikki()">⏹ Pysäytä</button>
+    <button id="fullscreen-main-btn" onclick="vaihdaKokoNaytto()">⛶ Koko näyttö</button>
   </div>
 
   <div id="info-box">
@@ -160,10 +175,11 @@
       <!-- Taustavideo -->
       <video id="bg-video" autoplay loop muted playsinline></video>
       
+      <button id="fullscreen-btn" type="button" onclick="vaihdaKokoNaytto()" aria-label="Koko näyttö" title="Koko näyttö">⛶</button>
       <button class="close-btn" onclick="suljeModal()">✕</button>
       
       <!-- Puhuva Avatar -video -->
-      <video id="modal-video" autoplay controls playsinline></video>
+      <video id="modal-video" autoplay playsinline webkit-playsinline controlslist="nofullscreen" disablepictureinpicture></video>
       <canvas id="lara-dual-canvas" width="540" height="960"></canvas>
       <video id="lara-dual-video" playsinline webkit-playsinline preload="auto" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
       
