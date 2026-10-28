@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rakuunamäki - Virtuaalinen Äänikävely</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; font-family: sans-serif; background: #111; color: #fff; overflow-x: hidden; }
+    
+    #map { height: 70vh; width: 100%; }
+    
+    #controls { padding: 6px; text-align: center; background: #222; }
+    button { padding: 8px 16px; font-size: 14px; font-weight: bold; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 2px; }
+    button:hover { background: #0056b3; }
+    
+    #info-box { padding: 8px 12px; background: #333; margin: 5px 8px; border-radius: 8px; display: flex; gap: 12px; align-items: center; min-height: 60px; }
+    .text-container { flex-grow: 1; }
+
+    .runner-avatar {
+      width: 65px;
+      height: 65px;
+      object-fit: contain;
+      filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.8));
+    }
+
+    #media-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      position: relative;
+      width: 90%;
+      max-width: 700px;
+      height: 75vh;
+      background-size: cover;
+      background-position: center;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+      box-sizing: border-box;
+      border: 2px solid #444;
+      overflow: hidden;
+    }
+
+    /* Taustavideo */
+    #bg-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      display: none;
+    }
+
+    /* Puhuva Lara kokovartalona ilman pyöreää kehystä */
+    #modal-video {
+      position: absolute;
+      z-index: 5;
+      right: auto;
+      left: 12px;
+      bottom: 18px;
+      width: auto;
+      height: 58%;
+      max-width: 42%;
+      object-fit: contain;
+      object-position: left bottom;
+      border-radius: 0;
+      display: none;
+      background: transparent;
+      box-shadow: none;
+      -webkit-mask-image: none;
+      mask-image: none;
+      filter: drop-shadow(0 5px 10px rgba(0,0,0,0.55));
+    }
+
+    #lara-dual-canvas { position:absolute; z-index:5; left:12px; bottom:18px; height:58%; max-width:42%; width:auto; aspect-ratio:9/16; display:none; pointer-events:none; filter:drop-shadow(0 5px 10px rgba(0,0,0,.55)); }
+    @media (max-width: 600px) {
+      #lara-dual-canvas {left:6px; bottom:12px; height:54%; max-width:46%;}
+      #modal-video {
+        right: auto;
+        left: 6px;
+        bottom: 12px;
+        height: 54%;
+        max-width: 46%;
+      }
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: #ff4444; color: white;
+      border: none; width: 36px; height: 36px;
+      font-size: 18px; font-weight: bold;
+      border-radius: 50%; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 10000;
+    }
+    .close-btn:hover { background: #cc0000; }
+
+    /* Koko esityksen suurennus, ei selaimen omaa videosoitinta. */
+    #fullscreen-btn { background:#176e7c; }
+    #modal-fullscreen-btn { position:absolute; top:12px; right:56px; z-index:10001; background:#176e7c; padding:8px 11px; font-size:18px; }
+    #media-modal:fullscreen, #media-modal:-webkit-full-screen,
+    #media-modal.laajennettu { width:100%; height:100%; inset:0; background:#000; }
+    #media-modal:fullscreen .modal-content,
+    #media-modal:-webkit-full-screen .modal-content,
+    #media-modal.laajennettu .modal-content {
+      width:100%; height:100%; max-width:none; max-height:none;
+      border:0; border-radius:0; box-shadow:none; padding:0;
+    }
+    @media (orientation: landscape) {
+      #media-modal .modal-content { width:96vw; height:94dvh; max-width:none; }
+      #media-modal:fullscreen .modal-content,
+      #media-modal:-webkit-full-screen .modal-content,
+      #media-modal.laajennettu .modal-content { width:100vw; height:100dvh; }
+      #media-modal #lara-dual-canvas { height:72%; max-width:36%; left:3%; bottom:2%; }
+      #media-modal #modal-video { height:72%; max-width:36%; left:3%; bottom:2%; }
+      #media-modal #modal-info-panel { max-width:65%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="aloitus-huomautus" style="
+    position:fixed; inset:0; z-index:20000; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.72); padding:20px; box-sizing:border-box;">
+    <div style="width:min(620px,94vw); background:#fff; color:#222; border-radius:14px; padding:22px;
+                box-shadow:0 10px 35px rgba(0,0,0,.4); box-sizing:border-box;">
+      <div style="font-size:22px; font-weight:700; margin-bottom:12px;">Tervetuloa Rakuunamäelle</div>
+      <p style="margin:0 0 12px; font-size:15px; line-height:1.5;">
+        Tämä virtuaaliesittely on tehty Rakuunamäen GPS-äänikävelyn pohjalta.
+        Äänikävelyssä tarinat käynnistyvät automaattisesti, kun kuljet paikan päällä kohteelta toiselle.
+      </p>
+      <p style="margin:0; font-size:15px; line-height:1.5;">
+        Historiallisia tapahtumia on elävöitetty tekoälyllä luoduilla kuvituskuvilla.
+        Kuvien henkilöt, univormut ja muut yksityiskohdat ovat viitteellisiä eivätkä kaikilta osin
+        vastaa aikakauden historiallisia yksityiskohtia.
+      </p>
+      <button type="button" onclick="document.getElementById('aloitus-huomautus').style.display='none'; aloitaAutomaatti();"
+        style="display:block; width:100%; margin-top:18px; padding:12px 18px; font-size:16px;
+               font-weight:700; cursor:pointer; border-radius:8px; border:none;
+               background:#007bff; color:#fff;">
+        ▶ Aloita virtuaaliesittely
+      </button>
+    </div>
+  </div>
+
+
+  <div id="map"></div>
+
+  <div id="controls">
+    <button onclick="aloitaAutomaatti()">▶ Katso Virtuaaliesittely</button>
+    <button onclick="pysaytaKaikki()">⏹ Pysäytä</button>
+    <button id="fullscreen-btn" onclick="vaihdaKokoNaytto()">⛶ Koko näyttö</button>
+  </div>
+
+  <div id="info-box">
+    <div class="text-container">
+      <h3 id="target-title" style="margin:0 0 4px 0;">Tervetuloa Rakuunamäelle</h3>
+      <p id="target-desc" style="margin:0; font-size: 14px;">Paina esittelynappia tai klikkaa kohteita kartalta tutustuaksesi tarinoihin.</p>
+    </div>
+  </div>
+
+  <div id="media-modal">
+    <div class="modal-content" id="modal-box">
+      <!-- Taustavideo -->
+      <video id="bg-video" autoplay loop muted playsinline></video>
+      
+      <button id="modal-fullscreen-btn" onclick="vaihdaKokoNaytto()" aria-label="Koko näyttö">⛶</button>
+      <button class="close-btn" onclick="suljeModal()">✕</button>
+      
+      <!-- Puhuva Avatar -video -->
+      <video id="modal-video" autoplay playsinline webkit-playsinline></video>
+      <canvas id="lara-dual-canvas" width="540" height="960"></canvas>
+      <video id="lara-dual-video" playsinline webkit-playsinline preload="auto" style="position:absolute;width:2px;height:2px;opacity:.01;pointer-events:none"></video>
+      
+      <!-- Kohteen nimi ja kuvaus: näkyy alussa 5 sekuntia ja häviää pehmeästi -->
+      <div id="modal-info-panel" style="position: absolute; left: 20px; right: 20px; bottom: 12px; z-index: 6; background: rgba(0, 0, 0, 0.72); padding: 7px 12px; border-radius: 7px; backdrop-filter: blur(4px); opacity: 1; transition: opacity 1s ease;">
+        <h2 id="modal-title" style="margin:0 0 2px 0; color:#fff; font-size:20px;"></h2>
+        <p id="modal-desc" style="margin:0; font-size:13px; color:#ddd;"></p>
+      </div>
+      <a id="linnoitus-linkki" href="#" target="_blank" rel="noopener"
+         style="display:none; position:absolute; right:20px; bottom:24px; z-index:8; padding:12px 18px; background:#7a241f; color:#fff; text-decoration:none; font-weight:bold; border-radius:9px; box-shadow:0 4px 14px rgba(0,0,0,.55);">
+        🎧 Avaa Linnoituksen äänikävely
+      </a>
+    </div>
+  </div>
+
+  <audio id="audio-player" preload="auto"></audio>
+
+  <script>
+    const map = L.map('map').setView([61.0594, 28.1775], 17);
+    
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    }).addTo(map);
+
+    // Sama tarkistettu kävelyreitti kuin GPS-äänikävelyssä.
+    const reittipisteet = [[61.059563,28.180007],[61.059781,28.178869],[61.059734,28.178204],[61.059126,28.178419],[61.059376,28.178279],[61.0591,28.173763],[61.059111,28.174524],[61.058322,28.17461],[61.058192,28.173645],[61.058005,28.172958],[61.058047,28.172035],[61.058275,28.171134],[61.058628,28.170705],[61.059261,28.170662],[61.0595,28.174503],[61.059718,28.174524],[61.059749,28.174825],[61.060019,28.174889]];
+    L.polyline(reittipisteet, {color:'#246fe5',weight:5,opacity:0.9}).addTo(map);
+
+    const kohteet = [
+      {
+        nimi: "Suomen ratsuväen muistomerkki",
+        lat: 61.059663,
+        lng: 28.180214,
+        audio: "",
+        kuvaus: "Wäino Aaltosen 1963 pystyttämä muistomerkki ja Nikolain vallit.",
+        kuva: "patsas1.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
+        video: "ratsuvaenpatsas_1080p.webm",
+         dual: "ratsuvaenpatsas_dual.mp4"
+      },
+      {
+        nimi: "Rakuunamäen pääportti & Pave Maijanen",
+        lat: 61.0597830,
+        lng: 28.1789770,
+        audio: "",
+        kuvaus: "Historiallinen pääportti ja Pave Maijasen lapsuudenkoti.",
+        kuva: "paaportti.mp4", /* Voit asettaa tähän joko .jpg tai .mp4 */
+        video: "paaportti.webm",
+         dual: "paaportti_dual.mp4"
+      },
+      {
+        nimi: "päävartio rakennus",
+        lat: 61.0591569,
+        lng: 28.1784266,
+        audio: "putka.mp3",
+        kuvaus: "Päävartiorakennus ja putka.",
+        kuva: "putka.png",
+        video: "paavartio.webm",
+         dual: "lara_dual_full.mp4"
+      },
+      {
+        nimi: "pohjustus ennen rakuunahotellia",
+        lat: 61.0593719,
+        lng: 28.1774570,
+        audio: "pohjustus.mp3",
+        kuvaus: "Pohjustus ennen hotellia.",
+        kuva: "pohjustus1.mp4",
+        video: "pohjustus.webm",
+         dual: "pohjustus_dual.mp4" 
+      },
+      {
+        nimi: "rakuunahotelli",
+        lat: 61.0592660,
+        lng: 28.17633415,
+        audio: "rakuunahotelli.mp3",
+        kuvaus: "Rakuunahotelli.",
+        kuva: "rakuunahotelli1.mp4",
+        video: "rakuunahotelli.webm",
+         dual: "rakuunahotelli_dual.mp4"
+      },
+      {
+        nimi: "sotilaskoti",
+        lat: 61.059182,
+        lng: 28.175187,
+        audio: "sotku.mp3",
+        kuvaus: "Sotilaskoti eli Sotku.",
+        kuva: "sotku3.mp4",
+        video: "sotku3.webm",
+         dual: "sotku3_dual.mp4"
+      },
+      {    
+        nimi: "ruokala",
+        lat: 61.0591133,
+        lng: 28.1737116,
+        audio: "ruokala.mp3",
+        kuvaus: "Kasarmin ruokala.",
+        kuva: "ruokala1.mp4",
+        video: "ruokala.webm",
+         dual: "ruokala_dual.mp4"
+      },
+      { 
+        nimi: "chymos portti",
+        lat: 61.058047,
+        lng: 28.173163,
+        audio: "chymosportti.mp3",
+        kuvaus: "Chymoksen tehtaan portti.",
+        kuva: "chymoksenportti1.mp4",
+        video: "Chymoksenportti1.webm",
+         dual: "Chymoksenportti1_dual.mp4"
+      },
+      { 
+        nimi: "chymos",
+        lat: 61.0580152,
+        lng: 28.1722136,
+        audio: "chymos.mp3",
+        kuvaus: "Chymoksen makeistehdasalue.",
+        kuva: "chymos.png",
+        video: "chymos.webm",
+         dual: "chymos_dual.mp4"     
+      },
+      {
+        nimi: "Upseerikerho",
+        lat: 61.0591837,
+        lng: 28.1705692,
+        audio: "Upseerikerho.mp3",
+        kuvaus: "Historiallinen Rakuunamäen Upseerikerho.",
+        kuva: "upseerikerho.mp4",
+        video: "upseerikerho.webm",
+         dual: "upseerikerho_dual.mp4"
+      },
+      {
+       nimi: "Tuju Taproom",
+        lat: 61.0594142,
+        lng: 28.1737352,
+        audio: "Tuju.mp3",
+        kuvaus: "TapRoom.",
+        kuva: "tuju.mp4",
+        video: "tuju.webm",
+         dual: "tuju_dual.mp4"
+      },
+      {
+        nimi: "Adolf Ehrnroothin aukio",
+        lat: 61.060096,
+        lng: 28.174944,
+        audio: "Adolf Ehrnroothin aukio.mp3",
+        kuvaus: "Rakuunamäen keskusaukio ja päätepiste.",
+        kuva: "aukio1.mp4",
+        video: "aukio.webm",
+         dual: "aukio_dual.mp4"
+      },
+      {
+        nimi: "Jatka matkaa Linnoitukseen",
+        loppukohtaus: true,
+        audio: "",
+        kuvaus: "Koe Lappeenrannan Linnoituksen äänikävely paikan päällä.",
+        kuva: "linnoitus_loppu.png",
+        video: "lara_linnoitus.webm",
+         dual: "lara_linnoitus_dual.mp4",
+        // ↓↓↓ LIITÄ LINNOITUKSEN ECHOES-KÄVELYN LINKKI ALLA OLEVIEN LAINAUSMERKKIEN VÄLIIN ↓↓↓
+         // Esimerkki: linkki: "",
+         linkki: "https://virtuaalikavelyt.github.io/historian-jaljilla/linnoitus/",
+      }
+    ];
+
+    let nykyinenIndex = 0;
+    let isAutoplay = false;
+    let animationFrame = null;
+    let meidanTimeout = null;
+    const player = document.getElementById('audio-player');
+    const videoPlayer = document.getElementById('modal-video');
+    const bgVideo = document.getElementById('bg-video');
+     const dualVideo = document.getElementById('lara-dual-video');
+     const dualCanvas = document.getElementById('lara-dual-canvas');
+     let dualRenderer = null, dualFrameId = null;
+     function luoDualPiirto() {
+       const gl=dualCanvas.getContext('webgl',{alpha:true,premultipliedAlpha:false});
+       if(!gl)throw Error('WebGL ei käytettävissä');
+       const vs='attribute vec2 p; varying vec2 uv; void main(){gl_Position=vec4(p,0.,1.);uv=(p+1.)*.5;}';
+       const fs='precision mediump float; varying vec2 uv; uniform sampler2D tex; void main(){vec2 xy=vec2(uv.x*.5,1.-uv.y);vec3 rgb=texture2D(tex,xy).rgb;vec3 mask=texture2D(tex,vec2(xy.x+.5,xy.y)).rgb;float a=dot(mask,vec3(.299,.587,.114));gl_FragColor=vec4(rgb,a);}';
+       function sh(type,src){const a=gl.createShader(type);gl.shaderSource(a,src);gl.compileShader(a);if(!gl.getShaderParameter(a,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(a));return a}
+       const program=gl.createProgram();gl.attachShader(program,sh(gl.VERTEX_SHADER,vs));gl.attachShader(program,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+       const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+       const loc=gl.getAttribLocation(program,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+       const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+       gl.clearColor(0,0,0,0);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+       return ()=>{if(dualVideo.readyState>=2){gl.clear(gl.COLOR_BUFFER_BIT);gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,dualVideo);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}};
+     }
+     function piirraDual(){if(dualVideo.paused||dualVideo.ended)return;try{dualRenderer();dualFrameId=requestAnimationFrame(piirraDual)}catch(e){console.error('Lara-piirto:',e);dualVideo.pause()}}
+
+    const modal = document.getElementById('media-modal');
+    const modalBox = document.getElementById('modal-box');
+
+    const hahmoIcon = L.divIcon({
+      className: 'custom-runner-icon',
+      html: '<img src="hahmo.png" class="runner-avatar">',
+      iconSize: [65, 65],
+      iconAnchor: [32, 32]
+    });
+
+    const hahmoMarker = L.marker([kohteet[0].lat, kohteet[0].lng], { icon: hahmoIcon }).addTo(map);
+
+    kohteet.forEach((kohde, index) => {
+      if (kohde.loppukohtaus) return;
+      const marker = L.marker([kohde.lat, kohde.lng]).addTo(map);
+      marker.bindPopup(`<b>${kohde.nimi}</b>`);
+      
+      marker.on('click', () => {
+        isAutoplay = false;
+        siirryKohteeseen(index, true);
+      });
+    });
+
+    function paivitaKokoNaytonPainikkeet() {
+      const laaja = !!document.fullscreenElement || modal.classList.contains('laajennettu');
+      document.getElementById('fullscreen-btn').textContent = laaja ? '⛶ Poistu koko näytöstä' : '⛶ Koko näyttö';
+      document.getElementById('modal-fullscreen-btn').textContent = laaja ? '⤢' : '⛶';
+    }
+
+    function vaihdaKokoNaytto() {
+      const aktiivinen = !!document.fullscreenElement || modal.classList.contains('laajennettu');
+      if (aktiivinen) {
+        modal.classList.remove('laajennettu');
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        paivitaKokoNaytonPainikkeet();
+        return;
+      }
+      // Selain hyväksyy koko näytön pyynnön vain painalluksesta.
+      // Jos selain (esim. iPhone Safari) ei tue elementin fullscreenia,
+      // suurennetaan koko esitys CSS:llä.
+      modal.classList.add('laajennettu');
+      if (modal.style.display === 'none' || !modal.style.display) modal.style.display = 'flex';
+      if (modal.requestFullscreen) {
+        modal.requestFullscreen({navigationUI:'hide'}).catch(() => {
+          modal.classList.add('laajennettu');
+          paivitaKokoNaytonPainikkeet();
+        });
+      }
+      paivitaKokoNaytonPainikkeet();
+    }
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) modal.classList.remove('laajennettu');
+      paivitaKokoNaytonPainikkeet();
+    });
+
+    function aloitaAutomaatti() {
+      isAutoplay = true;
+      siirryKohteeseen(0, true);
+    }
+
+    // Tervetuloa-ruudun lukemisen aikana ladataan jo kaksi ensimmäistä kohdetta.
+    // Näin ensimmäisen Laran pitäisi käynnistyä mahdollisimman valmiista välimuistista.
+    window.addEventListener('load', () => {
+      esilataaKohde(kohteet[0]);
+      esilataaKohde(kohteet[1]);
+    });
+
+    // Esilataus ilman Blob-välimuistia:
+    // selain saa ladata seuraavan kohteen mediat omaan normaaliin HTTP-välimuistiinsa.
+    const preloadCache = new Map();
+
+    function esilataaMedia(url) {
+      if (!url || preloadCache.has(url)) return;
+      const lower = url.toLowerCase();
+      if (lower.endsWith(".webm") || lower.endsWith(".mp4")) {
+        const v = document.createElement("video");
+        v.preload = "auto";
+        v.muted = true;
+        v.playsInline = true;
+        v.src = url;
+        v.load();
+        preloadCache.set(url, v);
+      } else {
+        const img = new Image();
+        img.src = url;
+        preloadCache.set(url, img);
+      }
+    }
+
+    function esilataaKohde(kohde) {
+      if (!kohde) return;
+      if (kohde.kuva) esilataaMedia(kohde.kuva);
+       if (kohde.dual) esilataaMedia(kohde.dual);
+       else if (kohde.video && kohde.video.trim() !== "") esilataaMedia(kohde.video);
+    }
+
+    function mediaSrc(url) {
+      return url;
+    }
+
+    function siirryKohteeseen(index, suoraan) {
+      pysaytaMedia();
+      if (meidanTimeout) clearTimeout(meidanTimeout);
+      nykyinenIndex = index;
+      const kohde = kohteet[index];
+
+      // Lataa nykyinen kohde sekä seuraava kohde selaimen normaaliin välimuistiin.
+      // Seuraava media saa näin latausaikaa jo karttaliikkeen ja nykyisen tarinan aikana.
+      esilataaKohde(kohde);
+      if (index + 1 < kohteet.length) esilataaKohde(kohteet[index + 1]);
+
+      // Linnoitus on erillinen loppukortti: karttahahmo jää Ehrnroothin aukiolle.
+      if (kohde.loppukohtaus) {
+        aktivoiMedia(kohde);
+        return;
+      }
+
+       const lahto = hahmoMarker.getLatLng();
+       const maali = L.latLng(kohde.lat, kohde.lng);
+
+       if (suoraan) {
+         // Kohteen manuaalinen valinta säilyy välittömänä.
+         hahmoMarker.setLatLng(maali);
+         map.flyTo(maali, 18, { duration: 1.2 });
+         aktivoiMedia(kohde);
+       } else {
+         // Automaattiesittely kulkee piirrettyä reittiä pitkin rakennusten yli oikaisemisen sijaan.
+         const edellinen = kohteet[index - 1];
+         const polku = muodostaReittimatka(edellinen, kohde);
+         const matkat = [0];
+         for (let i=1;i<polku.length;i++) matkat.push(matkat[i-1]+map.distance(polku[i-1],polku[i]));
+         const kokonaismatka = matkat[matkat.length-1];
+         const kesto = 3500; // Säilytetään entinen siirtymän kesto.
+         let startTime = null;
+         function animate(currentTime) {
+           if (startTime === null) startTime = currentTime;
+           const progress = Math.min((currentTime-startTime)/kesto,1);
+           const tavoite = progress*kokonaismatka;
+           let i=1;
+           while (i<matkat.length-1 && matkat[i]<tavoite) i++;
+           const osuus = matkat[i]>matkat[i-1] ? (tavoite-matkat[i-1])/(matkat[i]-matkat[i-1]) : 1;
+           const a=polku[i-1], b=polku[i];
+           const sijainti=L.latLng(a.lat+(b.lat-a.lat)*osuus,a.lng+(b.lng-a.lng)*osuus);
+           hahmoMarker.setLatLng(sijainti);
+           map.panTo(sijainti);
+           if (progress<1) animationFrame=requestAnimationFrame(animate);
+           else {
+             hahmoMarker.setLatLng(maali);
+             map.flyTo(maali,18,{duration:1.0});
+             aktivoiMedia(kohde);
+           }
+         }
+         animationFrame=requestAnimationFrame(animate);
+       }
+     }
+
+     // Etsitään kohteen lähin kohta reittiviivalta. Kohteet etenevät
+     // järjestyksessä, joten saman kadun paluuosuudella käytetään myöhempää reittiosuutta.
+     function reittiSijainti(kohde, minEtenema=0) {
+       const p=L.latLng(kohde.lat,kohde.lng);
+       const latScale=111000, lngScale=54000;
+       let paras=null;
+       for(let i=0;i<reittipisteet.length-1;i++) {
+         const a=reittipisteet[i], b=reittipisteet[i+1];
+         const dx=(b[1]-a[1])*lngScale,dy=(b[0]-a[0])*latScale;
+         const t=Math.max(0,Math.min(1,((p.lng-a[1])*lngScale*dx+(p.lat-a[0])*latScale*dy)/(dx*dx+dy*dy||1)));
+         const etenema=i+t;
+         if(etenema+0.00001<minEtenema) continue;
+         const lat=a[0]+t*(b[0]-a[0]),lng=a[1]+t*(b[1]-a[1]);
+         const etaisyys=map.distance(p,L.latLng(lat,lng));
+         if(!paras||etaisyys<paras.etaisyys) paras={etenema,lat,lng,etaisyys};
+       }
+       return paras || {etenema:reittipisteet.length-1,lat:reittipisteet.at(-1)[0],lng:reittipisteet.at(-1)[1]};
+     }
+
+     const reittikohdat=[];
+     for(let i=0;i<kohteet.length;i++) {
+       if(kohteet[i].loppukohtaus) continue;
+       const edellinen=i ? reittikohdat[i-1].etenema : 0;
+       reittikohdat.push(reittiSijainti(kohteet[i],edellinen));
+     }
+
+     function muodostaReittimatka(lahto,maali) {
+       const alku=reittikohdat[kohteet.indexOf(lahto)];
+       const loppu=reittikohdat[kohteet.indexOf(maali)];
+       if(!alku||!loppu) return [L.latLng(lahto.lat,lahto.lng),L.latLng(maali.lat,maali.lng)];
+       const polku=[L.latLng(lahto.lat,lahto.lng),L.latLng(alku.lat,alku.lng)];
+       for(let i=Math.floor(alku.etenema)+1;i<=Math.floor(loppu.etenema);i++) {
+         if(i>alku.etenema && i<loppu.etenema) polku.push(L.latLng(reittipisteet[i][0],reittipisteet[i][1]));
+       }
+       polku.push(L.latLng(loppu.lat,loppu.lng),L.latLng(maali.lat,maali.lng));
+       return polku;
+     }
+
+    function aktivoiMedia(kohde) {
+      document.getElementById('target-title').innerText = kohde.nimi;
+      document.getElementById('target-desc').innerText = kohde.kuvaus;
+      document.getElementById('modal-title').innerText = kohde.nimi;
+      document.getElementById('modal-desc').innerText = kohde.kuvaus;
+
+      // Näytä kohdepalkki aina uuden kohteen alussa ja häivytä se 5 sekunnin kuluttua
+      const infoPanel = document.getElementById('modal-info-panel');
+      infoPanel.style.display = 'block';
+      infoPanel.style.opacity = '1';
+      if (window.infoPanelTimeout) clearTimeout(window.infoPanelTimeout);
+      if (window.infoPanelHideTimeout) clearTimeout(window.infoPanelHideTimeout);
+      window.infoPanelTimeout = setTimeout(() => {
+        infoPanel.style.opacity = '0';
+        window.infoPanelHideTimeout = setTimeout(() => {
+          infoPanel.style.display = 'none';
+        }, 1000);
+      }, 5000);
+
+      // Poista edellisen kohteen tausta ennen uuden näyttämistä.
+      bgVideo.pause();
+      bgVideo.style.display = 'none';
+      bgVideo.removeAttribute('src');
+      modalBox.style.backgroundImage = 'none';
+      // Tarkistetaan onko kuva-kentässä taustavideo (.mp4) vai valokuva (.jpg/.png)
+      if (kohde.kuva && kohde.kuva.toLowerCase().endsWith('.mp4')) {
+        modalBox.style.backgroundImage = "none";
+        bgVideo.style.display = "block";
+        bgVideo.src = mediaSrc(kohde.kuva);
+        bgVideo.play().catch(e => console.log("Taustavideon toistovirhe:", e));
+      } else if (kohde.kuva && kohde.kuva.trim() !== "") {
+        bgVideo.style.display = "none";
+        bgVideo.removeAttribute('src');
+        modalBox.style.backgroundImage = `url('${kohde.kuva}')`;
+      } else {
+        bgVideo.style.display = "none";
+        bgVideo.removeAttribute('src');
+        modalBox.style.backgroundImage = "none";
+        modalBox.style.backgroundColor = "#222";
+      }
+
+      modal.style.display = "flex";
+
+      const linnoitusLinkki = document.getElementById('linnoitus-linkki');
+      linnoitusLinkki.style.display = "none";
+      if (kohde.loppukohtaus) linnoitusLinkki.href = kohde.linkki;
+
+      // Kaksoiskuva-MP4 vain Päävartion testissä; muut kohteet ennallaan.
+      // Uusi kaksoiskuva-MP4 kaikille Laroille; muut kävelyn toiminnot ennallaan.
+      if (kohde.dual) {
+        videoPlayer.style.display = 'none';
+        dualCanvas.style.display = 'none';
+        try {
+          if (!dualRenderer) dualRenderer = luoDualPiirto();
+          dualVideo.onended = () => {
+            if (kohde.loppukohtaus) {
+              dualCanvas.style.display = 'none';
+              document.getElementById('linnoitus-linkki').style.display = 'block';
+            } else if (kohteet[nykyinenIndex + 1]?.loppukohtaus) {
+              // Aukio -> Linnoitus suoraan saman avoimen ikkunan sisällä.
+              const seuraava = nykyinenIndex + 1;
+              nykyinenIndex = seuraava;
+              pysaytaMedia();
+              aktivoiMedia(kohteet[seuraava]);
+            } else {
+              dualCanvas.style.display = 'none';
+              suljeModal();
+              seuraavaKohdeAutomaatissa();
+            }
+          };
+          dualVideo.onerror = () => {
+            console.error('Laran MP4 ei latautunut:', kohde.dual);
+            dualCanvas.style.display = 'none';
+            if (kohde.loppukohtaus) {
+              document.getElementById('linnoitus-linkki').style.display = 'block';
+            } else {
+              toistaPelkkaAudio(kohde);
+            }
+          };
+          dualVideo.onplaying = () => {
+            if (dualVideo.readyState >= 2) {
+              dualRenderer();
+              dualCanvas.style.display = 'block';
+            }
+          };
+          dualVideo.src = mediaSrc(kohde.dual);
+          dualVideo.load();
+          dualVideo.play().then(() => {
+            if (!dualVideo.paused) piirraDual();
+          }).catch(e => {
+            // Ei hypätä kohteen yli, vaikka toisto estyisi.
+            console.warn('Laran käynnistys estyi:', e);
+          });
+          if (nykyinenIndex + 1 < kohteet.length) {
+            esilataaKohde(kohteet[nykyinenIndex + 1]);
+          }
+        } catch(e) {
+          console.error('Laran piirto ei onnistunut:', e);
+          dualCanvas.style.display = 'none';
+          if (kohde.loppukohtaus) document.getElementById('linnoitus-linkki').style.display = 'block';
+          else toistaPelkkaAudio(kohde);
+        }
+        return;
+      }
+      dualCanvas.style.display='none';
+      // Puhuva Avatar -video
+      if (kohde.video && kohde.video.trim() !== "") {
+        videoPlayer.style.display = "block";
+        videoPlayer.src = mediaSrc(kohde.video);
+        
+        videoPlayer.play().catch(e => console.log("Videotoiston virhe:", e));
+
+        // Nykyisen Laran puhuessa ladataan jo seuraavan pisteen media.
+        if (nykyinenIndex + 1 < kohteet.length) {
+          esilataaKohde(kohteet[nykyinenIndex + 1]);
+        }
+
+        videoPlayer.onended = function() {
+          if (kohde.loppukohtaus) {
+            videoPlayer.style.display = "none";
+            document.getElementById('linnoitus-linkki').style.display = "block";
+          } else {
+            const seuraava = nykyinenIndex + 1;
+
+            // Jos seuraavana on Linnoituksen loppumainos, vaihda siihen suoraan.
+            // Näin kartta ei välähdä Ehrnroothin aukion ja Linnoituksen välissä.
+            if (seuraava < kohteet.length && kohteet[seuraava].loppukohtaus) {
+              nykyinenIndex = seuraava;
+              aktivoiMedia(kohteet[seuraava]);
+            } else {
+              suljeModal();
+              seuraavaKohdeAutomaatissa();
+            }
+          }
+        };
+
+        videoPlayer.onerror = function() {
+          videoPlayer.style.display = "none";
+          if (kohde.loppukohtaus) {
+            document.getElementById('linnoitus-linkki').style.display = "block";
+          } else {
+            toistaPelkkaAudio(kohde);
+          }
+        };
+      } else {
+        videoPlayer.style.display = "none";
+        if (kohde.loppukohtaus) {
+          document.getElementById('linnoitus-linkki').style.display = "block";
+        } else {
+          toistaPelkkaAudio(kohde);
+        }
+      }
+    }
+
+    function toistaPelkkaAudio(kohde) {
+      if (kohde.audio && kohde.audio.trim() !== "") {
+        player.src = kohde.audio;
+        player.play().catch(e => {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        });
+
+        player.onended = function() {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        };
+
+        player.onerror = function() {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        };
+      } else {
+        meidanTimeout = setTimeout(() => {
+          suljeModal();
+          seuraavaKohdeAutomaatissa();
+        }, 3000);
+      }
+    }
+
+    function suljeModal() {
+      modal.style.display = "none";
+      pysaytaMedia();
+    }
+
+    function seuraavaKohdeAutomaatissa() {
+      // Ehrnroothin aukion jälkeen näytetään aina Linnoituksen loppumainos.
+      const seuraava = nykyinenIndex + 1;
+      if (seuraava < kohteet.length && kohteet[seuraava].loppukohtaus) {
+        nykyinenIndex = seuraava;
+        pysaytaMedia();
+        aktivoiMedia(kohteet[seuraava]);
+        return;
+      }
+
+      if (isAutoplay && seuraava < kohteet.length) {
+        meidanTimeout = setTimeout(() => {
+          siirryKohteeseen(seuraava, false);
+        }, 1500);
+      }
+    }
+
+    function pysaytaMedia() {
+       if(dualFrameId!==null){cancelAnimationFrame(dualFrameId);dualFrameId=null}
+       dualVideo.pause();dualVideo.removeAttribute('src');dualVideo.onended=null;dualVideo.onerror=null;dualVideo.onplaying=null;
+       dualCanvas.style.display='none';
+      player.pause();
+      player.removeAttribute('src');
+      videoPlayer.pause();
+      videoPlayer.removeAttribute('src');
+      bgVideo.pause();
+      bgVideo.removeAttribute('src');
+    }
+
+    function pysaytaKaikki() {
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      modal.classList.remove('laajennettu');
+      paivitaKokoNaytonPainikkeet();
+      isAutoplay = false;
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (meidanTimeout) clearTimeout(meidanTimeout);
+      suljeModal();
+      document.getElementById('target-title').innerText = "Esittely pysäytetty";
+      document.getElementById('target-desc').innerText = "Voit valita kohteen kartalta tai aloittaa uudelleen.";
+    }
+  </script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "860f9fc6e8434b4bbf40f0dfd3e6b080"}'></script><!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>
