@@ -101,6 +101,8 @@
       }
     }
 
+    #tauko-btn { position:absolute; top:57px; right:12px; z-index:10002; background:rgba(40,44,48,.68); color:#eee; border:1px solid rgba(255,255,255,.18); border-radius:18px; padding:6px 11px; font-size:12px; font-weight:500; min-width:73px; }
+    #tauko-btn:hover { background:rgba(40,44,48,.85); }
     .close-btn {
       position: absolute;
       top: 12px; right: 12px;
@@ -184,6 +186,7 @@
       
       <button id="modal-fullscreen-btn" onclick="vaihdaKokoNaytto()" aria-label="Koko näyttö">⛶</button>
       <button class="close-btn" onclick="suljeModal()">✕</button>
+      <button id="tauko-btn" type="button" onclick="vaihdaTauko()" aria-pressed="false">⏸ Tauko</button>
       
       <!-- Puhuva Avatar -video -->
       <video id="modal-video" autoplay playsinline webkit-playsinline></video>
@@ -210,6 +213,10 @@
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles &copy; Esri'
     }).addTo(map);
+
+    // Sama tarkistettu kävelyreitti kuin GPS-äänikävelyssä.
+    const reittipisteet = [[61.059563,28.180007],[61.059781,28.178869],[61.059734,28.178204],[61.059126,28.178419],[61.059376,28.178279],[61.0591,28.173763],[61.059111,28.174524],[61.058322,28.17461],[61.058192,28.173645],[61.058005,28.172958],[61.058047,28.172035],[61.058275,28.171134],[61.058628,28.170705],[61.059261,28.170662],[61.0595,28.174503],[61.059718,28.174524],[61.059749,28.174825],[61.060019,28.174889]];
+    L.polyline(reittipisteet, {color:'#B0B0B0',weight:3,opacity:0.7}).addTo(map);
 
     const kohteet = [
       {
@@ -349,6 +356,9 @@
     let nykyinenIndex = 0;
     let isAutoplay = false;
     let animationFrame = null;
+    let tauolla = false, taukoAlkoi = 0, taukoKertyma = 0;
+    let animStart = null, animPauseAlkoi = null;
+    let jatkoAjastin = null, jatkoJaljella = 0, jatkoAlkoi = 0, jatkoToiminto = null;
     let meidanTimeout = null;
     const player = document.getElementById('audio-player');
     const videoPlayer = document.getElementById('modal-video');
@@ -428,7 +438,49 @@
       paivitaKokoNaytonPainikkeet();
     });
 
+    function paivitaTaukoPainike() {
+      const b=document.getElementById("tauko-btn");
+      b.textContent=tauolla ? "▶ Jatka" : "⏸ Tauko";
+      b.setAttribute("aria-pressed",String(tauolla));
+    }
+    function nollaaTauko() {
+      tauolla=false; animPauseAlkoi=null; taukoKertyma=0;
+      if(jatkoAjastin!==null)clearTimeout(jatkoAjastin);
+      jatkoAjastin=null; jatkoToiminto=null; jatkoJaljella=0;
+      paivitaTaukoPainike();
+    }
+    function ajastaJatko(fn,ms) {
+      if(jatkoAjastin!==null)clearTimeout(jatkoAjastin);
+      jatkoToiminto=fn; jatkoJaljella=ms;
+      if(!tauolla){
+        jatkoAlkoi=performance.now();
+        jatkoAjastin=setTimeout(()=>{jatkoAjastin=null; jatkoToiminto=null; fn();},ms);
+      }
+    }
+    function vaihdaTauko() {
+      if(modal.style.display!=="flex")return;
+      tauolla=!tauolla; paivitaTaukoPainike();
+      if(tauolla){
+        if(jatkoAjastin!==null){
+          jatkoJaljella=Math.max(0,jatkoJaljella-(performance.now()-jatkoAlkoi));
+          clearTimeout(jatkoAjastin);jatkoAjastin=null;
+        }
+        [dualVideo,videoPlayer,bgVideo,player].forEach(v=>{if(!v.paused){v.dataset.taukoJatka="1";v.pause();}else v.dataset.taukoJatka="0";});
+        if(dualFrameId!==null){cancelAnimationFrame(dualFrameId);dualFrameId=null;}
+        if(animationFrame!==null){cancelAnimationFrame(animationFrame);animationFrame=null;animPauseAlkoi=performance.now();}
+      }else{
+        [dualVideo,videoPlayer,bgVideo,player].forEach(v=>{if(v.dataset.taukoJatka==="1")v.play().catch(e=>console.warn("Jatkaminen:",e));delete v.dataset.taukoJatka;});
+        if(!dualVideo.paused && dualVideo.readyState>=2)piirraDual();
+        if(animPauseAlkoi!==null && aktiivinenAnim){
+          aktiivinenAnim.siirraAikaa(performance.now()-animPauseAlkoi);
+          animPauseAlkoi=null;animationFrame=requestAnimationFrame(aktiivinenAnim.piirra);
+        }
+        if(jatkoToiminto)ajastaJatko(jatkoToiminto,jatkoJaljella);
+      }
+    }
+    let aktiivinenAnim=null;
     function aloitaAutomaatti() {
+      nollaaTauko();
       isAutoplay = true;
       siirryKohteeseen(0, true);
     }
@@ -474,6 +526,9 @@
     }
 
     function siirryKohteeseen(index, suoraan) {
+      nollaaTauko();
+      if(animationFrame!==null)cancelAnimationFrame(animationFrame);
+      animationFrame=null; aktiivinenAnim=null;
       pysaytaMedia();
       if (meidanTimeout) clearTimeout(meidanTimeout);
       nykyinenIndex = index;
@@ -490,38 +545,89 @@
         return;
       }
 
-      const lahto = hahmoMarker.getLatLng();
-      const maali = L.latLng(kohde.lat, kohde.lng);
+       const lahto = hahmoMarker.getLatLng();
+       const kohdanReittipiste = reittikohdat[index];
+       const maali = L.latLng(kohdanReittipiste.lat, kohdanReittipiste.lng);
 
-      if (suoraan) {
-        hahmoMarker.setLatLng(maali);
-        map.flyTo(maali, 18, { duration: 1.2 });
-        aktivoiMedia(kohde);
-      } else {
-        let startTime = null;
-        const kesto = 3500;
+       if (suoraan) {
+         // Kohteen manuaalinen valinta säilyy välittömänä.
+         hahmoMarker.setLatLng(maali);
+         map.flyTo(maali, 18, { duration: 1.2 });
+         aktivoiMedia(kohde);
+       } else {
+         // Automaattiesittely kulkee piirrettyä reittiä pitkin rakennusten yli oikaisemisen sijaan.
+         const edellinen = kohteet[index - 1];
+         const polku = muodostaReittimatka(edellinen, kohde);
+         const matkat = [0];
+         for (let i=1;i<polku.length;i++) matkat.push(matkat[i-1]+map.distance(polku[i-1],polku[i]));
+         const kokonaismatka = matkat[matkat.length-1];
+         const kesto = 3500; // Säilytetään entinen siirtymän kesto.
+         let startTime = null;
+         function animate(currentTime) {
+           if(tauolla)return;
+           if (startTime === null) startTime = currentTime;
+           const progress = Math.min((currentTime-startTime)/kesto,1);
+           const tavoite = progress*kokonaismatka;
+           let i=1;
+           while (i<matkat.length-1 && matkat[i]<tavoite) i++;
+           const osuus = matkat[i]>matkat[i-1] ? (tavoite-matkat[i-1])/(matkat[i]-matkat[i-1]) : 1;
+           const a=polku[i-1], b=polku[i];
+           const sijainti=L.latLng(a.lat+(b.lat-a.lat)*osuus,a.lng+(b.lng-a.lng)*osuus);
+           hahmoMarker.setLatLng(sijainti);
+           map.panTo(sijainti);
+           if (progress<1) animationFrame=requestAnimationFrame(animate);
+           else {
+             hahmoMarker.setLatLng(maali);
+             map.flyTo(maali,18,{duration:1.0});
+             aktiivinenAnim=null;animationFrame=null;
+             aktivoiMedia(kohde);
+           }
+         }
+         aktiivinenAnim={piirra:animate,siirraAikaa(ms){if(startTime!==null)startTime+=ms;}};
+         animationFrame=requestAnimationFrame(animate);
+       }
+     }
 
-        function animate(currentTime) {
-          if (!startTime) startTime = currentTime;
-          const progress = Math.min((currentTime - startTime) / kesto, 1);
-          
-          const curLat = lahto.lat + (maali.lat - lahto.lat) * progress;
-          const curLng = lahto.lng + (maali.lng - lahto.lng) * progress;
-          
-          const uusiSijainti = L.latLng(curLat, curLng);
-          hahmoMarker.setLatLng(uusiSijainti);
-          map.panTo(uusiSijainti);
+     // Etsitään kohteen lähin kohta reittiviivalta. Kohteet etenevät
+     // järjestyksessä, joten saman kadun paluuosuudella käytetään myöhempää reittiosuutta.
+     function reittiSijainti(kohde, minEtenema=0) {
+       const p=L.latLng(kohde.lat,kohde.lng);
+       const latScale=111000, lngScale=54000;
+       let paras=null;
+       for(let i=0;i<reittipisteet.length-1;i++) {
+         const a=reittipisteet[i], b=reittipisteet[i+1];
+         const dx=(b[1]-a[1])*lngScale,dy=(b[0]-a[0])*latScale;
+         const t=Math.max(0,Math.min(1,((p.lng-a[1])*lngScale*dx+(p.lat-a[0])*latScale*dy)/(dx*dx+dy*dy||1)));
+         const etenema=i+t;
+         if(etenema+0.00001<minEtenema) continue;
+         const lat=a[0]+t*(b[0]-a[0]),lng=a[1]+t*(b[1]-a[1]);
+         const etaisyys=map.distance(p,L.latLng(lat,lng));
+         if(!paras||etaisyys<paras.etaisyys) paras={etenema,lat,lng,etaisyys};
+       }
+       return paras || {etenema:reittipisteet.length-1,lat:reittipisteet.at(-1)[0],lng:reittipisteet.at(-1)[1]};
+     }
 
-          if (progress < 1) {
-            animationFrame = requestAnimationFrame(animate);
-          } else {
-            map.flyTo(maali, 18, { duration: 1.0 });
-            aktivoiMedia(kohde);
-          }
-        }
-        animationFrame = requestAnimationFrame(animate);
-      }
-    }
+     const reittikohdat=[];
+     for(let i=0;i<kohteet.length;i++) {
+       if(kohteet[i].loppukohtaus) continue;
+       const edellinen=i ? reittikohdat[i-1].etenema : 0;
+       reittikohdat.push(reittiSijainti(kohteet[i],edellinen));
+     }
+
+     // Hahmo pysyy reittiviivalla myös tarinan aikana ja kohteeseen saavuttaessa.
+    hahmoMarker.setLatLng([reittikohdat[0].lat,reittikohdat[0].lng]);
+
+    function muodostaReittimatka(lahto,maali) {
+       const alku=reittikohdat[kohteet.indexOf(lahto)];
+       const loppu=reittikohdat[kohteet.indexOf(maali)];
+       if(!alku||!loppu) return [L.latLng(lahto.lat,lahto.lng),L.latLng(maali.lat,maali.lng)];
+       const polku=[L.latLng(alku.lat,alku.lng)];
+       for(let i=Math.floor(alku.etenema)+1;i<=Math.floor(loppu.etenema);i++) {
+         if(i>alku.etenema && i<loppu.etenema) polku.push(L.latLng(reittipisteet[i][0],reittipisteet[i][1]));
+       }
+       polku.push(L.latLng(loppu.lat,loppu.lng));
+       return polku;
+     }
 
     function aktivoiMedia(kohde) {
       document.getElementById('target-title').innerText = kohde.nimi;
@@ -695,7 +801,7 @@
           seuraavaKohdeAutomaatissa();
         };
       } else {
-        meidanTimeout = setTimeout(() => {
+        ajastaJatko(() => {
           suljeModal();
           seuraavaKohdeAutomaatissa();
         }, 3000);
@@ -704,6 +810,7 @@
 
     function suljeModal() {
       modal.style.display = "none";
+      nollaaTauko();
       pysaytaMedia();
     }
 
@@ -718,7 +825,7 @@
       }
 
       if (isAutoplay && seuraava < kohteet.length) {
-        meidanTimeout = setTimeout(() => {
+        ajastaJatko(() => {
           siirryKohteeseen(seuraava, false);
         }, 1500);
       }
@@ -741,6 +848,7 @@
       modal.classList.remove('laajennettu');
       paivitaKokoNaytonPainikkeet();
       isAutoplay = false;
+      nollaaTauko(); aktiivinenAnim=null;
       if (animationFrame) cancelAnimationFrame(animationFrame);
       if (meidanTimeout) clearTimeout(meidanTimeout);
       suljeModal();
