@@ -213,7 +213,7 @@
 
     // Sama tarkistettu kävelyreitti kuin GPS-äänikävelyssä.
     const reittipisteet = [[61.059563,28.180007],[61.059781,28.178869],[61.059734,28.178204],[61.059126,28.178419],[61.059376,28.178279],[61.0591,28.173763],[61.059111,28.174524],[61.058322,28.17461],[61.058192,28.173645],[61.058005,28.172958],[61.058047,28.172035],[61.058275,28.171134],[61.058628,28.170705],[61.059261,28.170662],[61.0595,28.174503],[61.059718,28.174524],[61.059749,28.174825],[61.060019,28.174889]];
-    L.polyline(reittipisteet, {color:'#246fe5',weight:5,opacity:0.9}).addTo(map);
+    L.polyline(reittipisteet, {color:'#B0B0B0',weight:3,opacity:0.7}).addTo(map);
 
     const kohteet = [
       {
@@ -495,7 +495,8 @@
       }
 
        const lahto = hahmoMarker.getLatLng();
-       const maali = L.latLng(kohde.lat, kohde.lng);
+       const kohdanReittipiste = reittikohdat[index];
+       const maali = L.latLng(kohdanReittipiste.lat, kohdanReittipiste.lng);
 
        if (suoraan) {
          // Kohteen manuaalinen valinta säilyy välittömänä.
@@ -559,15 +560,18 @@
        reittikohdat.push(reittiSijainti(kohteet[i],edellinen));
      }
 
-     function muodostaReittimatka(lahto,maali) {
+     // Hahmo pysyy reittiviivalla myös tarinan aikana ja kohteeseen saavuttaessa.
+    hahmoMarker.setLatLng([reittikohdat[0].lat,reittikohdat[0].lng]);
+
+    function muodostaReittimatka(lahto,maali) {
        const alku=reittikohdat[kohteet.indexOf(lahto)];
        const loppu=reittikohdat[kohteet.indexOf(maali)];
        if(!alku||!loppu) return [L.latLng(lahto.lat,lahto.lng),L.latLng(maali.lat,maali.lng)];
-       const polku=[L.latLng(lahto.lat,lahto.lng),L.latLng(alku.lat,alku.lng)];
+       const polku=[L.latLng(alku.lat,alku.lng)];
        for(let i=Math.floor(alku.etenema)+1;i<=Math.floor(loppu.etenema);i++) {
          if(i>alku.etenema && i<loppu.etenema) polku.push(L.latLng(reittipisteet[i][0],reittipisteet[i][1]));
        }
-       polku.push(L.latLng(loppu.lat,loppu.lng),L.latLng(maali.lat,maali.lng));
+       polku.push(L.latLng(loppu.lat,loppu.lng));
        return polku;
      }
 
