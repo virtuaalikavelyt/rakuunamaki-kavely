@@ -571,8 +571,8 @@
          const matkat = [0];
          for (let i=1;i<polku.length;i++) matkat.push(matkat[i-1]+map.distance(polku[i-1],polku[i]));
          const kokonaismatka = matkat[matkat.length-1];
-         const kesto = 3500; // Säilytetään entinen siirtymän kesto.
-         if(window.laraLiike)window.laraLiike(kokonaismatka>200?'Running':'Walking');
+         const kesto = Math.max(6500, Math.min(8500, 6500 + kokonaismatka * 5)); // Rauhallinen kävely 6,5–8,5 s.
+         if(window.laraLiike)window.laraLiike('Walking');
          let startTime = null;
          function animate(currentTime) {
            if(tauolla)return;
@@ -912,14 +912,14 @@ try {
     model=g.scene;
     const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
     const height=Math.max(size.y,.001);
-    const scale=1.85/height;
+    const scale=1.55/height;
     model.scale.setScalar(scale);
     model.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale);
     scene.add(model);
     camera.position.set(0,1.12,4.35);camera.lookAt(0,.96,0);
     mixer=new THREE.AnimationMixer(model);
     for(const clip of g.animations){actions[clip.name]=mixer.clipAction(clip);}
-    ready=true;status.textContent='3D-Lara valmis: kävely ja juoksu';
+    ready=true;status.textContent='3D-Lara valmis: rauhallinen kävely';
     setTimeout(()=>{if(status.textContent.startsWith('3D-Lara valmis'))status.style.display='none'},3500);
     window.laraLiike(mode);
   },e=>{status.textContent='3D-Laran latausvirhe: '+e.message;console.error(e)});
